@@ -1,0 +1,11 @@
+{
+  "name": "healthcore-data-utils",
+  "version": "1.0.0",
+  "description": "Core TypeScript utilities for HealthCore data processing.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
