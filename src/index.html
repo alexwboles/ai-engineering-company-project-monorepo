@@ -9,12 +9,124 @@
 <body class="bg-gray-50 p-6">
   <div class="max-w-2xl mx-auto bg-white shadow rounded p-6">
     <h1 class="text-2xl font-bold mb-4">HealthCore Data Utilities Test</h1>
-    <p class="mb-2">Open the browser console to test your TypeScript functions.</p>
-    <ul class="list-disc ml-6">
-      <li>All core logic is implemented in <code>src/utils/</code> and <code>src/types/</code>.</li>
-      <li>Use the browser console to manually test filtering, sorting, searching, aggregations, and validations.</li>
-    </ul>
-    <div class="mt-4 text-sm text-gray-500">This page is for manual testing only. No UI controls are provided.</div>
+    <p class="mb-2">Test your TypeScript functions interactively below.</p>
+    <div class="mb-4">
+      <label class="block font-semibold mb-1">Choose Function:</label>
+      <select id="functionSelect" class="border rounded px-2 py-1 w-full" title="Choose Function to Test">
+        <option value="filter">Filter Employees (country = US)</option>
+        <option value="sort">Sort Patients by Name</option>
+        <option value="search">Search Clinic by Name</option>
+        <option value="aggregate">Aggregate Appointments by Status</option>
+        <option value="validate">Validate Patient</option>
+      </select>
+    </div>
+    <button id="runBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Run Test</button>
+    <div id="output" class="mt-6 bg-gray-100 rounded p-4 text-sm"></div>
   </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      // Inline sample data and functions for browser testing
+      function filterBy(array, predicate) {
+        return array.filter(predicate);
+      }
+      function sortBy(array, key, ascending = true) {
+        return [...array].sort((a, b) => {
+          if (a[key] === b[key]) return 0;
+          if (a[key] == null) return 1;
+          if (b[key] == null) return -1;
+          if (a[key] < b[key]) return ascending ? -1 : 1;
+          return ascending ? 1 : -1;
+        });
+      }
+      function linearSearch(array, predicate) {
+        for (let i = 0; i < array.length; i++) {
+          if (predicate(array[i])) return i;
+        }
+        return -1;
+      }
+      function countBy(array, key) {
+        return array.reduce((acc, item) => {
+          const k = String(item[key]);
+          acc[k] = (acc[k] || 0) + 1;
+          return acc;
+        }, {});
+      }
+      function validatePatient(patient) {
+        const errors = [];
+        if (!patient.id) errors.push('Missing patient id');
+        if (!patient.name) errors.push('Missing patient name');
+        if (!patient.country) errors.push('Missing patient country');
+        if (!patient.clinicId) errors.push('Missing clinicId');
+        if (!patient.dateOfBirth) errors.push('Missing date of birth');
+        if (!patient.language) errors.push('Missing language');
+        return errors;
+      }
+
+      // Sample data
+      const employees = [
+        { id: 'e1', name: 'Alice', role: 'Nurse', clinicId: 'c1', country: 'US', hireDate: '2020-01-01', isClinician: true, cmeHours: 10 },
+        { id: 'e2', name: 'Bob', role: 'Operations', clinicId: 'c2', country: 'UK', hireDate: '2021-03-15', isClinician: false },
+      ];
+      const patients = [
+        { id: 'p1', name: 'Jane', country: 'US', clinicId: 'c1', dateOfBirth: '1980-05-10', language: 'English' },
+        { id: 'p2', name: 'John', country: 'UK', clinicId: 'c2', dateOfBirth: '1975-09-20', language: 'Spanish' },
+      ];
+      const clinics = [
+        { id: 'c1', name: 'HealthCore US', country: 'US', city: 'New York', address: '123 Main St', ehrSystem: 'US' },
+        { id: 'c2', name: 'HealthCore UK', country: 'UK', city: 'London', address: '456 Queen St', ehrSystem: 'UK' },
+      ];
+      const appointments = [
+        { id: 'a1', patientId: 'p1', clinicId: 'c1', date: '2024-04-01', time: '09:00', status: 'Scheduled', createdBy: 'e1' },
+        { id: 'a2', patientId: 'p2', clinicId: 'c2', date: '2024-04-02', time: '10:00', status: 'Completed', createdBy: 'e2' },
+        { id: 'a3', patientId: 'p1', clinicId: 'c1', date: '2024-04-03', time: '11:00', status: 'Cancelled', createdBy: 'e1' },
+      ];
+      const invalidPatient = { id: '', name: '', country: '', clinicId: '', dateOfBirth: '', language: '' };
+
+      function renderResult(result) {
+        const output = document.getElementById('output');
+        if (Array.isArray(result)) {
+          if (result.length === 0) {
+            output.innerHTML = '<span class="text-gray-500">No results found.</span>';
+          } else if (typeof result[0] === 'string') {
+            // Validation errors or string array
+            output.innerHTML = '<ul class="list-disc ml-6">' + result.map(e => `<li>${e}</li>`).join('') + '</ul>';
+          } else if (typeof result[0] === 'object') {
+            // Array of objects (table)
+            const keys = Object.keys(result[0]);
+            output.innerHTML = '<div class="overflow-x-auto"><table class="min-w-full text-left"><thead><tr>' +
+              keys.map(k => `<th class="px-2 py-1 border-b font-semibold">${k}</th>`).join('') +
+              '</tr></thead><tbody>' +
+              result.map(row => '<tr>' + keys.map(k => `<td class="px-2 py-1 border-b">${row[k]}</td>`).join('') + '</tr>').join('') +
+              '</tbody></table></div>';
+          } else {
+            output.innerHTML = `<span>${result.join(', ')}</span>`;
+          }
+        } else if (typeof result === 'object' && result !== null) {
+          // Object (aggregate)
+          output.innerHTML = '<ul class="list-disc ml-6">' + Object.entries(result).map(([k, v]) => `<li><span class="font-semibold">${k}:</span> ${v}</li>`).join('') + '</ul>';
+        } else {
+          output.innerHTML = `<span>${result}</span>`;
+        }
+      }
+
+      document.getElementById('runBtn').onclick = () => {
+        const fn = document.getElementById('functionSelect').value;
+        let result;
+        if (fn === 'filter') {
+          result = filterBy(employees, e => e.country === 'US');
+        } else if (fn === 'sort') {
+          result = sortBy(patients, 'name', true);
+        } else if (fn === 'search') {
+          const idx = linearSearch(clinics, c => c.name === 'HealthCore UK');
+          result = idx >= 0 ? clinics[idx] : 'Not found';
+        } else if (fn === 'aggregate') {
+          result = countBy(appointments, 'status');
+        } else if (fn === 'validate') {
+          result = validatePatient(invalidPatient);
+        }
+        renderResult(result);
+      };
+    });
+  </script>
 </body>
 </html>
