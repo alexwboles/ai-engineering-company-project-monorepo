@@ -13,15 +13,26 @@
     <div class="mb-4">
       <label class="block font-semibold mb-1">Choose Function:</label>
       <select id="functionSelect" class="border rounded px-2 py-1 w-full" title="Choose Function to Test">
-        <option value="filter">Filter Employees (country = US)</option>
-        <option value="sort">Sort Patients by Name</option>
-        <option value="search">Search Clinic by Name</option>
+        <option value="filter">Filter Clinicians (country = US)</option>
+        <option value="sort">Sort Clinicians by Last Name</option>
+        <option value="search">Search Location by Name</option>
         <option value="aggregate">Aggregate Appointments by Status</option>
-        <option value="validate">Validate Patient</option>
+        <option value="validate">Validate Patient Object</option>
       </select>
     </div>
     <button id="runBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Run Test</button>
     <div id="output" class="mt-6 bg-gray-100 rounded p-4 text-sm"></div>
+    <div id="help" class="mt-8 p-4 bg-blue-50 border border-blue-200 rounded text-blue-900 text-sm">
+      <h2 class="font-bold mb-2 text-blue-800">Function Descriptions</h2>
+      <ul class="list-disc ml-6">
+        <li><span class="font-semibold">Filter Clinicians (country = US):</span> Shows all clinicians whose location is in the US.</li>
+        <li><span class="font-semibold">Sort Clinicians by Last Name:</span> Sorts all clinicians alphabetically by their last name.</li>
+        <li><span class="font-semibold">Search Location by Name:</span> Finds a location by its name (e.g., "HealthCore Miami").</li>
+        <li><span class="font-semibold">Aggregate Appointments by Status:</span> Counts how many appointments exist for each status (e.g., completed, no_show).</li>
+        <li><span class="font-semibold">Validate Patient Object:</span> Checks a sample patient object for missing required fields and lists validation errors.</li>
+      </ul>
+      <p class="mt-2 text-blue-700">Select a function above and click "Run Test" to see the output below. Output is formatted for readability.</p>
+    </div>
   </div>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -284,12 +295,22 @@
             // Validation errors or string array
             output.innerHTML = '<ul class="list-disc ml-6">' + result.map(e => `<li>${e}</li>`).join('') + '</ul>';
           } else if (typeof result[0] === 'object') {
-            // Array of objects (table)
+            // Array of objects (table with expandable rows)
             const keys = Object.keys(result[0]);
             output.innerHTML = '<div class="overflow-x-auto"><table class="min-w-full text-left"><thead><tr>' +
               keys.map(k => `<th class="px-2 py-1 border-b font-semibold">${k}</th>`).join('') +
               '</tr></thead><tbody>' +
-              result.map(row => '<tr>' + keys.map(k => `<td class="px-2 py-1 border-b">${row[k]}</td>`).join('') + '</tr>').join('') +
+              result.map((row, i) => '<tr class="hover:bg-gray-200 cursor-pointer" onclick="this.nextElementSibling.classList.toggle(\'hidden\')">' +
+                keys.map(k => `<td class="px-2 py-1 border-b">${typeof row[k] === 'object' && row[k] !== null ? '[details]' : row[k]}</td>`).join('') +
+                '</tr>' +
+                `<tr class="hidden"><td colspan="${keys.length}" class="bg-gray-50 px-2 py-1 text-xs">` +
+                Object.entries(row).map(([k, v]) =>
+                  typeof v === 'object' && v !== null
+                    ? `<div><span class="font-semibold">${k}:</span> <pre class="whitespace-pre-wrap">${JSON.stringify(v, null, 2)}</pre></div>`
+                    : ''
+                ).join('') +
+                '</td></tr>'
+              ).join('') +
               '</tbody></table></div>';
           } else {
             output.innerHTML = `<span>${result.join(', ')}</span>`;
@@ -306,15 +327,23 @@
         const fn = document.getElementById('functionSelect').value;
         let result;
         if (fn === 'filter') {
-          result = filterBy(employees, e => e.country === 'US');
+          // Use sampleClinicians as 'employees', filter by country using locationId
+          // Map locationId to country using sampleLocations
+          const locationMap = Object.fromEntries(sampleLocations.map(loc => [loc.locationId, loc.country]));
+          result = filterBy(sampleClinicians, c => locationMap[c.locationId] === 'US');
         } else if (fn === 'sort') {
-          result = sortBy(patients, 'name', true);
+          // Use sampleClinicians as 'patients', sort by lastName
+          result = sortBy(sampleClinicians, 'lastName', true);
         } else if (fn === 'search') {
-          const idx = linearSearch(clinics, c => c.name === 'HealthCore UK');
-          result = idx >= 0 ? clinics[idx] : 'Not found';
+          // Use sampleLocations as 'clinics', search for 'HealthCore Miami'
+          const idx = linearSearch(sampleLocations, c => c.name === 'HealthCore Miami');
+          result = idx >= 0 ? sampleLocations[idx] : 'Not found';
         } else if (fn === 'aggregate') {
-          result = countBy(appointments, 'status');
+          // Use sampleAppointments as 'appointments', aggregate by status
+          result = countBy(sampleAppointments, 'status');
         } else if (fn === 'validate') {
+          // Use a deliberately invalid patient object
+          const invalidPatient = { id: '', name: '', country: '', clinicId: '', dateOfBirth: '', language: '' };
           result = validatePatient(invalidPatient);
         }
         renderResult(result);
