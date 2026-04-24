@@ -1,64 +1,57 @@
 // HealthCore Data Models
-// Define interfaces for the main business entities based on the CONTEXT.md
-
-// Clinic entity
-export interface Clinic {
-  id: string;
-  name: string;
-  country: 'US' | 'UK';
-  city: string;
-  address: string;
-  ehrSystem: 'US' | 'UK'; // US and UK use different EHRs
-}
-
-// Employee entity
-export interface Employee {
-  id: string;
-  name: string;
-  role: 'Physician' | 'Nurse Practitioner' | 'Nurse' | 'Medical Assistant' | 'Operations' | 'Administration' | 'Technology' | 'Other';
-  clinicId: string;
-  country: 'US' | 'UK';
-  hireDate: string; // ISO date
-  isClinician: boolean;
-  cmeHours?: number; // Continuing Medical Education hours (clinicians only)
-}
-
-// Patient entity
-export interface Patient {
-  id: string;
-  name: string;
-  country: 'US' | 'UK';
-  clinicId: string;
-  dateOfBirth: string; // ISO date
-  language: 'English' | 'Spanish' | 'Other';
-}
-
-// Appointment entity
-export interface Appointment {
-  id: string;
+export interface Claim {
+  claimId: string;
   patientId: string;
-  clinicId: string;
-  date: string; // ISO date
-  time: string; // HH:mm
-  status: 'Scheduled' | 'Completed' | 'No-Show' | 'Cancelled';
-  createdBy: string; // Employee ID
+  locationId: string;
+  serviceType: ServiceType;
+  payerName: string;
+  payerId: string;
+  submissionDate: string;
+  claimAmount: number;
+  status: ClaimStatus;
+  denialReason?: DenialReason;
+  resubmitted: boolean;
 }
 
-// Billing entity
-export interface Billing {
-  id: string;
+export type ClaimStatus = "submitted" | "approved" | "denied" | "pending" | "appealed";
+export type DenialReason = "missing_authorisation" | "coding_error" | "duplicate_claim" | "patient_not_covered" | "service_not_covered" | "incomplete_documentation";
+export type ServiceType = "primary_care" | "chronic_disease" | "preventive" | "specialist" | "womens_health" | "paediatric" | "mental_health";
+
+export interface Appointment {
   appointmentId: string;
-  country: 'US' | 'UK';
-  amount: number;
-  status: 'Pending' | 'Paid' | 'Denied';
-  payer: 'Insurance' | 'Medicare' | 'Medicaid' | 'Private' | 'NHS';
+  patientId: string;
+  locationId: string;
+  serviceType: ServiceType;
+  scheduledDate: string;
+  scheduledTime: string;
+  status: AppointmentStatus;
+  noShowReason?: string;
+  confirmedAt?: string;
 }
 
-// Compliance Training entity
-export interface ComplianceTraining {
-  id: string;
-  employeeId: string;
-  completed: boolean;
-  dateCompleted?: string; // ISO date
-  type: 'HIPAA' | 'GDPR' | 'Other';
+export type AppointmentStatus = "scheduled" | "confirmed" | "completed" | "no_show" | "cancelled";
+
+export interface Clinician {
+  clinicianId: string;
+  firstName: string;
+  lastName: string;
+  role: ClinicianRole;
+  locationId: string;
+  licenceState: string;
+  licenceExpiryDate: string;
+  cmeHoursRequired: number;
+  cmeHoursLogged: number;
+  cmeYearStartDate: string;
+}
+
+export type ClinicianRole = "physician" | "nurse_practitioner" | "nurse" | "medical_assistant";
+
+export interface Location {
+  locationId: string;
+  name: string;
+  city: string;
+  stateOrCountry: string;
+  country: "US" | "UK";
+  phone: string;
+  averageConsultationFee: Record<ServiceType, number>;
 }

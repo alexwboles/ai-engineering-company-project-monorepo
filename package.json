@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "description": "Core TypeScript utilities for HealthCore data processing.",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "start": "npx serve src"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "tailwindcss": "^3.4.1"
   }
 }

@@ -1,67 +1,42 @@
-// Business validation functions for HealthCore
-import { Clinic, Employee, Patient, Appointment, Billing, ComplianceTraining } from '../types/models';
+// Validation utilities for HealthCore
+import { Appointment, Clinician, Claim } from '../types/models';
 
-// Validate required fields for Patient
-export function validatePatient(patient: Patient): string[] {
-  const errors: string[] = [];
-  if (!patient.id) errors.push('Missing patient id');
-  if (!patient.name) errors.push('Missing patient name');
-  if (!patient.country) errors.push('Missing patient country');
-  if (!patient.clinicId) errors.push('Missing clinicId');
-  if (!patient.dateOfBirth) errors.push('Missing date of birth');
-  if (!patient.language) errors.push('Missing language');
-  return errors;
-}
-
-// Validate required fields and CME hours for Employee
-export function validateEmployee(employee: Employee): string[] {
-  const errors: string[] = [];
-  if (!employee.id) errors.push('Missing employee id');
-  if (!employee.name) errors.push('Missing employee name');
-  if (!employee.role) errors.push('Missing employee role');
-  if (!employee.clinicId) errors.push('Missing clinicId');
-  if (!employee.country) errors.push('Missing country');
-  if (!employee.hireDate) errors.push('Missing hire date');
-  if (employee.isClinician && (employee.cmeHours == null || employee.cmeHours < 0)) {
-    errors.push('Clinician must have non-negative CME hours');
-  }
-  return errors;
-}
-
-// Validate appointment status and required fields
 export function validateAppointment(appointment: Appointment): string[] {
   const errors: string[] = [];
-  if (!appointment.id) errors.push('Missing appointment id');
+  if (!appointment.appointmentId) errors.push('Missing appointment id');
   if (!appointment.patientId) errors.push('Missing patientId');
-  if (!appointment.clinicId) errors.push('Missing clinicId');
-  if (!appointment.date) errors.push('Missing date');
-  if (!appointment.time) errors.push('Missing time');
+  if (!appointment.locationId) errors.push('Missing locationId');
+  if (!appointment.scheduledDate) errors.push('Missing scheduledDate');
+  if (!appointment.scheduledTime) errors.push('Missing scheduledTime');
   if (!appointment.status) errors.push('Missing status');
-  if (!appointment.createdBy) errors.push('Missing createdBy');
-  if (!['Scheduled', 'Completed', 'No-Show', 'Cancelled'].includes(appointment.status)) {
-    errors.push('Invalid appointment status');
-  }
   return errors;
 }
 
-// Validate billing
-export function validateBilling(billing: Billing): string[] {
+export function validateClinician(clinician: Clinician): string[] {
   const errors: string[] = [];
-  if (!billing.id) errors.push('Missing billing id');
-  if (!billing.appointmentId) errors.push('Missing appointmentId');
-  if (!billing.country) errors.push('Missing country');
-  if (billing.amount == null || billing.amount < 0) errors.push('Invalid amount');
-  if (!billing.status) errors.push('Missing status');
-  if (!billing.payer) errors.push('Missing payer');
+  if (!clinician.clinicianId) errors.push('Missing clinicianId');
+  if (!clinician.firstName) errors.push('Missing firstName');
+  if (!clinician.lastName) errors.push('Missing lastName');
+  if (!clinician.role) errors.push('Missing role');
+  if (!clinician.locationId) errors.push('Missing locationId');
+  if (!clinician.licenceState) errors.push('Missing licenceState');
+  if (!clinician.licenceExpiryDate) errors.push('Missing licenceExpiryDate');
+  if (clinician.cmeHoursRequired == null) errors.push('Missing cmeHoursRequired');
+  if (clinician.cmeHoursLogged == null) errors.push('Missing cmeHoursLogged');
+  if (!clinician.cmeYearStartDate) errors.push('Missing cmeYearStartDate');
   return errors;
 }
 
-// Validate compliance training
-export function validateComplianceTraining(training: ComplianceTraining): string[] {
+export function validateClaim(claim: Claim): string[] {
   const errors: string[] = [];
-  if (!training.id) errors.push('Missing training id');
-  if (!training.employeeId) errors.push('Missing employeeId');
-  if (training.completed && !training.dateCompleted) errors.push('Completed training must have dateCompleted');
-  if (!training.type) errors.push('Missing training type');
+  if (!claim.claimId) errors.push('Missing claimId');
+  if (!claim.patientId) errors.push('Missing patientId');
+  if (!claim.locationId) errors.push('Missing locationId');
+  if (!claim.serviceType) errors.push('Missing serviceType');
+  if (!claim.payerName) errors.push('Missing payerName');
+  if (!claim.payerId) errors.push('Missing payerId');
+  if (!claim.submissionDate) errors.push('Missing submissionDate');
+  if (claim.claimAmount == null) errors.push('Missing claimAmount');
+  if (!claim.status) errors.push('Missing status');
   return errors;
 }
