@@ -560,8 +560,14 @@ function initAppointmentsTab() {
 
     renderAppointmentsTable(result);
 
+    // Render no-show rate by location as a table
     const rates = noShowRateByLocation(sampleAppointments);
-    $("appt-noshow-by-location").textContent = JSON.stringify(rates, null, 2);
+    let noshowTable = '<table class="min-w-full text-xs"><thead><tr><th class="px-2 py-1 text-left">Location</th><th class="px-2 py-1 text-right">No‑Show Rate</th></tr></thead><tbody>';
+    for (const loc in rates) {
+      noshowTable += `<tr><td class="border px-2 py-1">${loc}</td><td class="border px-2 py-1 text-right">${rates[loc].toFixed(2)}%</td></tr>`;
+    }
+    noshowTable += '</tbody></table>';
+    $("appt-noshow-by-location").innerHTML = noshowTable;
 
     const locationObj = sampleLocations.find((l) => l.locationId === (loc || result[0]?.locationId));
     if (locationObj && weekInput.value) {
@@ -587,11 +593,14 @@ function initAppointmentsTab() {
   });
 
   renderAppointmentsTable(sampleAppointments);
-  $("appt-noshow-by-location").textContent = JSON.stringify(
-    noShowRateByLocation(sampleAppointments),
-    null,
-    2
-  );
+  // Render initial no-show rate by location as a table
+  const rates = noShowRateByLocation(sampleAppointments);
+  let noshowTable = '<table class="min-w-full text-xs"><thead><tr><th class="px-2 py-1 text-left">Location</th><th class="px-2 py-1 text-right">No‑Show Rate</th></tr></thead><tbody>';
+  for (const loc in rates) {
+    noshowTable += `<tr><td class="border px-2 py-1">${loc}</td><td class="border px-2 py-1 text-right">${rates[loc].toFixed(2)}%</td></tr>`;
+  }
+  noshowTable += '</tbody></table>';
+  $("appt-noshow-by-location").innerHTML = noshowTable;
 }
 
 // Clinicians tab
@@ -624,11 +633,23 @@ function initCliniciansTab() {
     renderCmeTable(report, statusSelect.value || "");
 
     const atRisk = getCliniciansAtRisk(sampleClinicians, asOf);
-    $("cme-at-risk").textContent = JSON.stringify(atRisk, null, 2);
+    // Render at risk clinicians as a table
+    let atRiskTable = '<table class="min-w-full text-xs"><thead><tr><th class="px-2 py-1 text-left">Clinician</th><th class="px-2 py-1 text-left">Role</th><th class="px-2 py-1 text-right">Hours</th><th class="px-2 py-1 text-right">% Complete</th><th class="px-2 py-1 text-left">Status</th></tr></thead><tbody>';
+    atRisk.forEach(r => {
+      atRiskTable += `<tr><td class="border px-2 py-1">${r.fullName}</td><td class="border px-2 py-1">${r.role}</td><td class="border px-2 py-1 text-right">${r.hoursLogged}/${r.hoursRequired}</td><td class="border px-2 py-1 text-right">${r.percentComplete.toFixed(1)}%</td><td class="border px-2 py-1">${r.complianceStatus}</td></tr>`;
+    });
+    atRiskTable += '</tbody></table>';
+    $("cme-at-risk").innerHTML = atRiskTable;
 
     const threshold = Number(licenceThresholdInput.value || "90");
     const expiring = getCliniciansWithExpiringLicences(sampleClinicians, asOf, threshold);
-    $("cme-licence-expiring").textContent = JSON.stringify(expiring, null, 2);
+    // Render expiring licenses as a table
+    let expiringTable = '<table class="min-w-full text-xs"><thead><tr><th class="px-2 py-1 text-left">Clinician</th><th class="px-2 py-1 text-left">Role</th><th class="px-2 py-1 text-left">Expiry Date</th><th class="px-2 py-1 text-right">Days Left</th></tr></thead><tbody>';
+    expiring.forEach(r => {
+      expiringTable += `<tr><td class="border px-2 py-1">${r.fullName}</td><td class="border px-2 py-1">${r.role}</td><td class="border px-2 py-1">${r.licenceExpiryDate}</td><td class="border px-2 py-1 text-right">${r.licenceDaysRemaining}</td></tr>`;
+    });
+    expiringTable += '</tbody></table>';
+    $("cme-licence-expiring").innerHTML = expiringTable;
   }
 
   $("cme-apply").addEventListener("click", apply);
