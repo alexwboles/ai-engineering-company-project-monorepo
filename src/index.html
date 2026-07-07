@@ -1,132 +1,294 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <title>HealthCore Operations Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HealthCore Data Utilities Test</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="./tailwind.output.css">
+  <script defer src="./healthcore-dashboard.js"></script>
 </head>
-<body class="bg-gray-50 p-6">
-  <div class="max-w-2xl mx-auto bg-white shadow rounded p-6">
-    <h1 class="text-2xl font-bold mb-4">HealthCore Data Utilities Test</h1>
-    <p class="mb-2">Test your TypeScript functions interactively below.</p>
-    <div class="mb-4">
-      <label class="block font-semibold mb-1">Choose Function:</label>
-      <select id="functionSelect" class="border rounded px-2 py-1 w-full" title="Choose Function to Test">
-        <option value="filter">Filter Employees (country = US)</option>
-        <option value="sort">Sort Patients by Name</option>
-        <option value="search">Search Clinic by Name</option>
-        <option value="aggregate">Aggregate Appointments by Status</option>
-        <option value="validate">Validate Patient</option>
-      </select>
-    </div>
-    <button id="runBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Run Test</button>
-    <div id="output" class="mt-6 bg-gray-100 rounded p-4 text-sm"></div>
+<body class="bg-slate-100 min-h-screen">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-900 text-slate-100 flex flex-col">
+      <div class="px-6 py-4 border-b border-slate-800">
+        <h1 class="text-xl font-semibold">HealthCore</h1>
+        <p class="text-xs text-slate-400">Operations Dashboard</p>
+      </div>
+      <nav class="flex-1 px-4 py-4 space-y-2">
+        <button data-tab="overview"
+          class="tab-btn w-full text-left px-3 py-2 rounded bg-slate-800 text-sm">
+          Overview
+        </button>
+        <button data-tab="claims"
+          class="tab-btn w-full text-left px-3 py-2 rounded hover:bg-slate-800 text-sm">
+          Claims & Denials
+        </button>
+        <button data-tab="appointments"
+          class="tab-btn w-full text-left px-3 py-2 rounded hover:bg-slate-800 text-sm">
+          Appointments & No‑Shows
+        </button>
+        <button data-tab="clinicians"
+          class="tab-btn w-full text-left px-3 py-2 rounded hover:bg-slate-800 text-sm">
+          CME & Licences
+        </button>
+      </nav>
+      <div class="px-4 py-3 text-xs text-slate-500 border-t border-slate-800">
+        Milestone 2 — Programming Fundamentals
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 p-6 space-y-6">
+      <!-- Overview -->
+      <section id="tab-overview" class="tab-panel space-y-6">
+        <h2 class="text-2xl font-semibold text-slate-900">Overview</h2>
+        <div class="grid gap-4 md:grid-cols-3">
+          <div class="bg-white rounded shadow p-4">
+            <p class="text-xs text-slate-500">Overall Denial Rate</p>
+            <p id="overview-denial-rate" class="text-2xl font-semibold mt-1">–</p>
+            <p class="text-xs text-slate-400 mt-1">Target &lt; 8%</p>
+          </div>
+          <div class="bg-white rounded shadow p-4">
+            <p class="text-xs text-slate-500">Overall No‑Show Rate</p>
+            <p id="overview-noshow-rate" class="text-2xl font-semibold mt-1">–</p>
+            <p class="text-xs text-slate-400 mt-1">Alert at 20%</p>
+          </div>
+          <div class="bg-white rounded shadow p-4">
+            <p class="text-xs text-slate-500">Clinicians At Risk / Overdue</p>
+            <p id="overview-cme-risk" class="text-2xl font-semibold mt-1">–</p>
+            <p class="text-xs text-slate-400 mt-1">CME compliance</p>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-sm font-semibold mb-2">Denial Rate by Payer</h3>
+            <div id="overview-denial-by-payer" class="bg-slate-50 border border-slate-200 rounded p-3 overflow-auto h-48">
+              <!-- Table will be rendered here -->
+            </div>
+          </div>
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-sm font-semibold mb-2">No‑Show Rate by Location</h3>
+            <div id="overview-noshow-by-location" class="bg-slate-50 border border-slate-200 rounded p-3 overflow-auto h-48">
+              <!-- Table will be rendered here -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Claims -->
+      <section id="tab-claims" class="tab-panel hidden space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-semibold text-slate-900">Claims & Denials</h2>
+        </div>
+
+        <div class="bg-white rounded shadow p-4 space-y-3">
+          <div class="grid gap-3 md:grid-cols-4">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Payer</label>
+              <input id="claims-filter-payer" class="w-full border rounded px-2 py-1 text-sm" placeholder="BlueCross" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Location ID</label>
+              <input id="claims-filter-location" class="w-full border rounded px-2 py-1 text-sm" placeholder="us-tx-001" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Status</label>
+              <select id="claims-filter-status" class="w-full border rounded px-2 py-1 text-sm" title="Claim Status" aria-label="Claim Status">
+                <option value="">Any</option>
+                <option>submitted</option>
+                <option>approved</option>
+                <option>denied</option>
+                <option>pending</option>
+                <option>appealed</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Service Type</label>
+              <select id="claims-filter-service" class="w-full border rounded px-2 py-1 text-sm" title="Service Type" aria-label="Service Type">
+                <option value="">Any</option>
+                <option>primary_care</option>
+                <option>chronic_disease</option>
+                <option>preventive</option>
+                <option>specialist</option>
+                <option>womens_health</option>
+                <option>paediatric</option>
+                <option>mental_health</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2 items-end">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Search Claim ID</label>
+              <input id="claims-search-id" class="border rounded px-2 py-1 text-sm" placeholder="CLM-000004" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Sort by ID</label>
+              <select id="claims-sort-direction" class="border rounded px-2 py-1 text-sm" title="Sort by ID" aria-label="Sort by ID">
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+            <button id="claims-apply"
+              class="px-3 py-2 bg-slate-900 text-white rounded text-sm">
+              Apply Filters
+            </button>
+            <button id="claims-reset"
+              class="px-3 py-2 border border-slate-300 rounded text-sm">
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded shadow overflow-hidden">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th class="px-3 py-2 text-left">Claim ID</th>
+                <th class="px-3 py-2 text-left">Payer</th>
+                <th class="px-3 py-2 text-left">Location</th>
+                <th class="px-3 py-2 text-left">Service</th>
+                <th class="px-3 py-2 text-left">Status</th>
+                <th class="px-3 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody id="claims-table-body" class="divide-y divide-slate-100 bg-white"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Appointments -->
+      <section id="tab-appointments" class="tab-panel hidden space-y-4">
+        <h2 class="text-2xl font-semibold text-slate-900">Appointments & No‑Shows</h2>
+
+        <div class="bg-white rounded shadow p-4 space-y-3">
+          <div class="grid gap-3 md:grid-cols-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Location ID</label>
+              <input id="appt-filter-location" class="w-full border rounded px-2 py-1 text-sm" placeholder="us-fl-001" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Status</label>
+              <select id="appt-filter-status" class="w-full border rounded px-2 py-1 text-sm" title="Appointment Status" aria-label="Appointment Status">
+                <option value="">Any</option>
+                <option>scheduled</option>
+                <option>confirmed</option>
+                <option>completed</option>
+                <option>no_show</option>
+                <option>cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Week Ending Date</label>
+              <input id="appt-week-ending" type="date" class="w-full border rounded px-2 py-1 text-sm" value="2025-03-14" title="Select week ending date" placeholder="YYYY-MM-DD" />
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 items-end">
+            <button id="appt-apply"
+              class="px-3 py-2 bg-slate-900 text-white rounded text-sm">
+              Apply Filters
+            </button>
+            <button id="appt-reset"
+              class="px-3 py-2 border border-slate-300 rounded text-sm">
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-sm font-semibold mb-2">Appointments</h3>
+            <table class="min-w-full text-xs">
+              <thead class="bg-slate-50 text-[10px] uppercase text-slate-500">
+                <tr>
+                  <th class="px-2 py-1 text-left">ID</th>
+                  <th class="px-2 py-1 text-left">Location</th>
+                  <th class="px-2 py-1 text-left">Service</th>
+                  <th class="px-2 py-1 text-left">Status</th>
+                  <th class="px-2 py-1 text-left">Date</th>
+                </tr>
+              </thead>
+              <tbody id="appt-table-body" class="divide-y divide-slate-100 bg-white"></tbody>
+            </table>
+          </div>
+          <div class="bg-white rounded shadow p-4 space-y-3">
+            <div>
+              <h3 class="text-sm font-semibold mb-1">No‑Show Rate by Location</h3>
+              <div id="appt-noshow-by-location" class="bg-slate-50 border border-slate-200 rounded p-3 overflow-auto h-32"></div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold mb-1">Estimated No‑Show Cost (Selected Location)</h3>
+              <p id="appt-noshow-cost" class="text-lg font-semibold text-slate-900">–</p>
+              <p class="text-xs text-slate-400 mt-1">Uses average consultation fee per service type.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Clinicians -->
+      <section id="tab-clinicians" class="tab-panel hidden space-y-4">
+        <h2 class="text-2xl font-semibold text-slate-900">CME & Licence Compliance</h2>
+
+        <div class="bg-white rounded shadow p-4 space-y-3">
+          <div class="grid gap-3 md:grid-cols-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">As of Date</label>
+              <input id="cme-as-of" type="date" class="w-full border rounded px-2 py-1 text-sm" value="2025-03-15" title="As of date" placeholder="YYYY-MM-DD" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Filter Status</label>
+              <select id="cme-filter-status" class="w-full border rounded px-2 py-1 text-sm" title="CME Status" aria-label="CME Status">
+                <option value="">Any</option>
+                <option>on_track</option>
+                <option>at_risk</option>
+                <option>overdue</option>
+                <option>complete</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Licence Alert Threshold (days)</label>
+              <input id="cme-licence-threshold" type="number" class="w-full border rounded px-2 py-1 text-sm" value="90" title="Licence alert threshold in days" placeholder="90" />
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 items-end">
+            <button id="cme-apply"
+              class="px-3 py-2 bg-slate-900 text-white rounded text-sm">
+              Refresh Report
+            </button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="bg-white rounded shadow p-4">
+            <h3 class="text-sm font-semibold mb-2">CME Report</h3>
+            <table class="min-w-full text-xs">
+              <thead class="bg-slate-50 text-[10px] uppercase text-slate-500">
+                <tr>
+                  <th class="px-2 py-1 text-left">Clinician</th>
+                  <th class="px-2 py-1 text-left">Role</th>
+                  <th class="px-2 py-1 text-right">Hours</th>
+                  <th class="px-2 py-1 text-right">% Complete</th>
+                  <th class="px-2 py-1 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody id="cme-table-body" class="divide-y divide-slate-100 bg-white"></tbody>
+            </table>
+          </div>
+          <div class="bg-white rounded shadow p-4 space-y-3">
+            <div>
+              <h3 class="text-sm font-semibold mb-1">Clinicians At Risk / Overdue</h3>
+              <div id="cme-at-risk" class="bg-slate-50 border border-slate-200 rounded p-3 overflow-auto h-24"></div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold mb-1">Licences Expiring (Threshold)</h3>
+              <div id="cme-licence-expiring" class="bg-slate-50 border border-slate-200 rounded p-3 overflow-auto h-24"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      // Inline sample data and functions for browser testing
-      function filterBy(array, predicate) {
-        return array.filter(predicate);
-      }
-      function sortBy(array, key, ascending = true) {
-        return [...array].sort((a, b) => {
-          if (a[key] === b[key]) return 0;
-          if (a[key] == null) return 1;
-          if (b[key] == null) return -1;
-          if (a[key] < b[key]) return ascending ? -1 : 1;
-          return ascending ? 1 : -1;
-        });
-      }
-      function linearSearch(array, predicate) {
-        for (let i = 0; i < array.length; i++) {
-          if (predicate(array[i])) return i;
-        }
-        return -1;
-      }
-      function countBy(array, key) {
-        return array.reduce((acc, item) => {
-          const k = String(item[key]);
-          acc[k] = (acc[k] || 0) + 1;
-          return acc;
-        }, {});
-      }
-      function validatePatient(patient) {
-        const errors = [];
-        if (!patient.id) errors.push('Missing patient id');
-        if (!patient.name) errors.push('Missing patient name');
-        if (!patient.country) errors.push('Missing patient country');
-        if (!patient.clinicId) errors.push('Missing clinicId');
-        if (!patient.dateOfBirth) errors.push('Missing date of birth');
-        if (!patient.language) errors.push('Missing language');
-        return errors;
-      }
-
-      // Sample data
-      const employees = [
-        { id: 'e1', name: 'Alice', role: 'Nurse', clinicId: 'c1', country: 'US', hireDate: '2020-01-01', isClinician: true, cmeHours: 10 },
-        { id: 'e2', name: 'Bob', role: 'Operations', clinicId: 'c2', country: 'UK', hireDate: '2021-03-15', isClinician: false },
-      ];
-      const patients = [
-        { id: 'p1', name: 'Jane', country: 'US', clinicId: 'c1', dateOfBirth: '1980-05-10', language: 'English' },
-        { id: 'p2', name: 'John', country: 'UK', clinicId: 'c2', dateOfBirth: '1975-09-20', language: 'Spanish' },
-      ];
-      const clinics = [
-        { id: 'c1', name: 'HealthCore US', country: 'US', city: 'New York', address: '123 Main St', ehrSystem: 'US' },
-        { id: 'c2', name: 'HealthCore UK', country: 'UK', city: 'London', address: '456 Queen St', ehrSystem: 'UK' },
-      ];
-      const appointments = [
-        { id: 'a1', patientId: 'p1', clinicId: 'c1', date: '2024-04-01', time: '09:00', status: 'Scheduled', createdBy: 'e1' },
-        { id: 'a2', patientId: 'p2', clinicId: 'c2', date: '2024-04-02', time: '10:00', status: 'Completed', createdBy: 'e2' },
-        { id: 'a3', patientId: 'p1', clinicId: 'c1', date: '2024-04-03', time: '11:00', status: 'Cancelled', createdBy: 'e1' },
-      ];
-      const invalidPatient = { id: '', name: '', country: '', clinicId: '', dateOfBirth: '', language: '' };
-
-      function renderResult(result) {
-        const output = document.getElementById('output');
-        if (Array.isArray(result)) {
-          if (result.length === 0) {
-            output.innerHTML = '<span class="text-gray-500">No results found.</span>';
-          } else if (typeof result[0] === 'string') {
-            // Validation errors or string array
-            output.innerHTML = '<ul class="list-disc ml-6">' + result.map(e => `<li>${e}</li>`).join('') + '</ul>';
-          } else if (typeof result[0] === 'object') {
-            // Array of objects (table)
-            const keys = Object.keys(result[0]);
-            output.innerHTML = '<div class="overflow-x-auto"><table class="min-w-full text-left"><thead><tr>' +
-              keys.map(k => `<th class="px-2 py-1 border-b font-semibold">${k}</th>`).join('') +
-              '</tr></thead><tbody>' +
-              result.map(row => '<tr>' + keys.map(k => `<td class="px-2 py-1 border-b">${row[k]}</td>`).join('') + '</tr>').join('') +
-              '</tbody></table></div>';
-          } else {
-            output.innerHTML = `<span>${result.join(', ')}</span>`;
-          }
-        } else if (typeof result === 'object' && result !== null) {
-          // Object (aggregate)
-          output.innerHTML = '<ul class="list-disc ml-6">' + Object.entries(result).map(([k, v]) => `<li><span class="font-semibold">${k}:</span> ${v}</li>`).join('') + '</ul>';
-        } else {
-          output.innerHTML = `<span>${result}</span>`;
-        }
-      }
-
-      document.getElementById('runBtn').onclick = () => {
-        const fn = document.getElementById('functionSelect').value;
-        let result;
-        if (fn === 'filter') {
-          result = filterBy(employees, e => e.country === 'US');
-        } else if (fn === 'sort') {
-          result = sortBy(patients, 'name', true);
-        } else if (fn === 'search') {
-          const idx = linearSearch(clinics, c => c.name === 'HealthCore UK');
-          result = idx >= 0 ? clinics[idx] : 'Not found';
-        } else if (fn === 'aggregate') {
-          result = countBy(appointments, 'status');
-        } else if (fn === 'validate') {
-          result = validatePatient(invalidPatient);
-        }
-        renderResult(result);
-      };
-    });
-  </script>
 </body>
 </html>

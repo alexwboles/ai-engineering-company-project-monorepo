@@ -1,6 +1,4 @@
-// Search functions for HealthCore collections
-
-// Linear search: returns index of first match or -1
+// Search utilities for HealthCore
 export function linearSearch<T>(array: T[], predicate: (item: T) => boolean): number {
   for (let i = 0; i < array.length; i++) {
     if (predicate(array[i])) return i;
@@ -8,7 +6,6 @@ export function linearSearch<T>(array: T[], predicate: (item: T) => boolean): nu
   return -1;
 }
 
-// Binary search: assumes array is sorted by the key
 export function binarySearch<T>(array: T[], key: keyof T, value: T[keyof T]): number {
   let left = 0;
   let right = array.length - 1;

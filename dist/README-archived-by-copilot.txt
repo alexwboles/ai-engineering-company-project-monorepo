@@ -1,0 +1,1 @@
+This folder contained unused or legacy JS files from a previous build. All files have been archived by GitHub Copilot for workspace cleanup.

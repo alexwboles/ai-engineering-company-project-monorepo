@@ -37,3 +37,40 @@ Dr. Okonkwo has created an internal unit called HealthCore Digital to build the 
 You are part of that unit.
 
 _Until you add your context, keep this placeholder so the repo structure is clear._
+
+## Sample Data
+
+### Clinicians
+```json
+[
+  { "id": 1, "name": "Dr. Alice Smith", "specialty": "Cardiology", "active": true },
+  { "id": 2, "name": "Dr. Bob Jones", "specialty": "Neurology", "active": true },
+  { "id": 3, "name": "Dr. Carol Lee", "specialty": "Pediatrics", "active": false }
+]
+```
+
+### Appointments
+```json
+[
+  { "id": 1, "patient": "John Doe", "clinicianId": 1, "date": "2024-04-01", "status": "completed", "noShow": false },
+  { "id": 2, "patient": "Jane Roe", "clinicianId": 2, "date": "2024-04-02", "status": "no-show", "noShow": true },
+  { "id": 3, "patient": "Sam Lee", "clinicianId": 1, "date": "2024-04-03", "status": "completed", "noShow": false }
+]
+```
+
+### Claims
+```json
+[
+  { "id": 1, "appointmentId": 1, "amount": 200, "status": "approved" },
+  { "id": 2, "appointmentId": 2, "amount": 150, "status": "denied" },
+  { "id": 3, "appointmentId": 3, "amount": 180, "status": "approved" }
+]
+```
+
+### Locations
+```json
+[
+  { "id": 1, "name": "Main Clinic", "address": "123 Main St" },
+  { "id": 2, "name": "Westside Branch", "address": "456 West Ave" }
+]
+```
