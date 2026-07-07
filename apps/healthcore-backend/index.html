@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>HealthCore — No Build Version</title>
+  <script src="healthcore.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    pre { background: #111; color: #0f0; padding: 20px; }
+  </style>
+</head>
+<body>
+
+<h1>HealthCore — No Build Version</h1>
+
+<button onclick="runFilter()">Filter Claims</button>
+<button onclick="runSort()">Sort Claims</button>
+<button onclick="runFind()">Find Claim</button>
+<button onclick="runDenial()">Denial Rates</button>
+<button onclick="runNoShow()">No-Show Cost</button>
+<button onclick="runCME()">CME Report</button>
+
+<pre id="output"></pre>
+
+<script>
+function show(data) {
+  document.getElementById("output").textContent =
+    JSON.stringify(data, null, 2);
+}
+
+function runFilter() {
+  show(HealthCore.filterClaims(HealthCore.sampleClaims, { payerName: "BlueCross" }));
+}
+
+function runSort() {
+  show(HealthCore.sortClaimsById(HealthCore.sampleClaims));
+}
+
+function runFind() {
+  show(HealthCore.findClaimById(HealthCore.sampleClaims, "CLM-000004"));
+}
+
+function runDenial() {
+  show(HealthCore.denialRateByPayer(HealthCore.sampleClaims));
+}
+
+function runNoShow() {
+  const loc = HealthCore.sampleLocations[0];
+  show(HealthCore.calculateNoShowCost(HealthCore.sampleAppointments, loc, "2025-03-14"));
+}
+
+function runCME() {
+  show(HealthCore.generateCMEReport(HealthCore.sampleClinicians, "2025-03-15"));
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "healthcore-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "dev": "node --watch ./dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
