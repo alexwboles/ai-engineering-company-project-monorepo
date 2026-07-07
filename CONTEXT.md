@@ -1,4 +1,5 @@
-Welcome to HealthCore
+# Welcome to HealthCore
+
 AI Engineering · 4Geeks Academy — Company Briefing
 HealthCore is an outpatient healthcare services company founded in 2011 in Austin, Texas. It operates a network of 12 clinics — 9 in the United States (Texas, Florida, and Georgia) and 3 in the United Kingdom (London and Manchester) — offering primary care, specialist consultations, chronic disease management, and preventive health programmes. The company employs approximately 200 people across clinical staff, operations, administration, and a growing technology unit. Annual revenue sits around 28 million dollars.
 
@@ -41,6 +42,7 @@ _Until you add your context, keep this placeholder so the repo structure is clea
 ## Sample Data
 
 ### Clinicians
+
 ```json
 [
   { "id": 1, "name": "Dr. Alice Smith", "specialty": "Cardiology", "active": true },
@@ -50,6 +52,7 @@ _Until you add your context, keep this placeholder so the repo structure is clea
 ```
 
 ### Appointments
+
 ```json
 [
   { "id": 1, "patient": "John Doe", "clinicianId": 1, "date": "2024-04-01", "status": "completed", "noShow": false },
@@ -59,6 +62,7 @@ _Until you add your context, keep this placeholder so the repo structure is clea
 ```
 
 ### Claims
+
 ```json
 [
   { "id": 1, "appointmentId": 1, "amount": 200, "status": "approved" },
@@ -68,6 +72,7 @@ _Until you add your context, keep this placeholder so the repo structure is clea
 ```
 
 ### Locations
+
 ```json
 [
   { "id": 1, "name": "Main Clinic", "address": "123 Main St" },

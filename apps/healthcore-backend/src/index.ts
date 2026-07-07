@@ -1,0 +1,8 @@
+// apps/healthcore-backend/src/index.ts
+
+export * from "./utils/collections";
+export * from "./utils/search";
+export * from "./utils/transformations";
+export * from "./utils/validations";
+
+console.log("HealthCore backend utilities loaded.");

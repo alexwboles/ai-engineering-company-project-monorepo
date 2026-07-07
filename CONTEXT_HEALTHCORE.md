@@ -186,6 +186,7 @@ interface Location {
 ## Sample Data
 
 ### Clinicians
+
 ```json
 [
   { "id": 1, "name": "Dr. Alice Smith", "specialty": "Cardiology", "active": true },
@@ -195,6 +196,7 @@ interface Location {
 ```
 
 ### Appointments
+
 ```json
 [
   { "id": 1, "patient": "John Doe", "clinicianId": 1, "date": "2024-04-01", "status": "completed", "noShow": false },
@@ -204,6 +206,7 @@ interface Location {
 ```
 
 ### Claims
+
 ```json
 [
   { "id": 1, "appointmentId": 1, "amount": 200, "status": "approved" },
@@ -213,6 +216,7 @@ interface Location {
 ```
 
 ### Locations
+
 ```json
 [
   { "id": 1, "name": "Main Clinic", "address": "123 Main St" },
