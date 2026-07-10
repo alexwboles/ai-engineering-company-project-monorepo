@@ -10,6 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 try:
+    from services.api.routes import suppliers_router
+except ModuleNotFoundError:
+    from routes import suppliers_router
+
+try:
     # Works when imported as services.api.main from repository root.
     from services.api.incident_analysis import (
         analyze_incident_rows,
@@ -32,6 +37,8 @@ app.add_middleware(
 
 _last_analysis_summary_csv: str | None = None
 _last_analysis_payload: dict[str, Any] | None = None
+
+app.include_router(suppliers_router)
 
 
 @app.get("/health")
@@ -89,3 +96,5 @@ def export_last_results() -> Response:
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=results.csv"},
     )
+
+
