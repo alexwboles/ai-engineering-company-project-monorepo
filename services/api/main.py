@@ -6,15 +6,18 @@ from dataclasses import asdict
 from typing import Any
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.responses import Response
+from starlette.requests import Request
 
 try:
     from services.api.auth_security import get_current_user
-    from services.api.routes import auth_router, profiles_router, suppliers_router, users_router
+    from services.api.routes import auth_router, incidents_router, profiles_router, suppliers_router, users_router
 except ModuleNotFoundError:
     from auth_security import get_current_user
-    from routes import auth_router, profiles_router, suppliers_router, users_router
+    from routes import auth_router, incidents_router, profiles_router, suppliers_router, users_router
 
 try:
     # Works when imported as services.api.main from repository root.
@@ -44,6 +47,32 @@ app.include_router(suppliers_router)
 app.include_router(users_router)
 app.include_router(profiles_router)
 app.include_router(auth_router)
+app.include_router(incidents_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    details: list[dict[str, object]] = []
+    for err in exc.errors():
+        loc = err.get("loc", [])
+        field = str(loc[-1]) if loc else "field"
+        details.append(
+            {
+                "loc": ["body", field],
+                "msg": f"{field.replace('_', ' ').title()} is invalid.",
+                "type": "value_error",
+            }
+        )
+
+    return JSONResponse(status_code=400, content={"detail": details})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_request: Request, _exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again."},
+    )
 
 
 @app.get("/health")

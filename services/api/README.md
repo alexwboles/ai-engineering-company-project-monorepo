@@ -29,6 +29,33 @@ The supplier directory follows this layout:
 - `GET /api/incidents/results/export`
   - Returns downloadable `results.csv` from the latest analysis.
 
+### Incident manager
+
+- `POST /api/incidents`
+  - Creates a new incident record.
+  - Returns `400` with field-specific validation details for invalid input.
+- `GET /api/incidents`
+  - Lists incidents.
+  - Optional query params: `status`, `origin`, `branch`, `category`.
+- `GET /api/incidents/{id}`
+  - Returns one incident by identifier.
+  - Returns `404` when no incident exists.
+- `PATCH /api/incidents/{id}/status`
+  - Updates only incident status using lifecycle rules.
+  - Returns `400` for invalid transitions.
+- `GET /api/incidents/summary`
+  - Returns aggregate metrics totals by status, category, origin, and branch.
+
+### Historical incident seed script
+
+From repository root:
+
+```bash
+python scripts/seed_incidents.py
+```
+
+The seed script is idempotent and does not duplicate rows already loaded from the source CSV.
+
 ### Supplier directory
 
 - `POST /suppliers`

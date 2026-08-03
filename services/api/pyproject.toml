@@ -24,7 +24,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["routes", "incident_analysis"]
-py-modules = ["seed", "main", "models", "database", "auth_models", "auth_security", "user_service", "email_service"]
+py-modules = ["seed", "main", "models", "database", "auth_models", "auth_security", "user_service", "email_service", "incidents_service"]
 
 [dependency-groups]
 dev = []

@@ -35,6 +35,9 @@ export function NavClient() {
       <Link href="/suppliers" className="rounded-full bg-teal-100 px-3 py-1 font-medium text-teal-800 hover:bg-teal-200">
         Suppliers
       </Link>
+      <Link href="/incidents" className="rounded-full bg-cyan-100 px-3 py-1 font-medium text-cyan-800 hover:bg-cyan-200">
+        Incidents
+      </Link>
       <Link href="/account/profile" className="rounded-full bg-indigo-100 px-3 py-1 font-medium text-indigo-800 hover:bg-indigo-200">
         Profile
       </Link>
