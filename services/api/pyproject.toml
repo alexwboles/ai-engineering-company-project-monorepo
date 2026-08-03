@@ -27,4 +27,8 @@ packages = ["routes", "incident_analysis"]
 py-modules = ["seed", "main", "models", "database", "auth_models", "auth_security", "user_service", "email_service", "incidents_service"]
 
 [dependency-groups]
-dev = []
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
