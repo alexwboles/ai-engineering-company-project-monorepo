@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getStoredToken } from "@/lib/auth-client";
 
-const PUBLIC_PATHS = new Set(["/login", "/register"]);
+const PUBLIC_PATHS = new Set(["/login", "/register", "/forgot-password", "/reset-password"]);
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

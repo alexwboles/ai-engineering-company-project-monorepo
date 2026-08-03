@@ -44,6 +44,27 @@ def _jwt_algorithm() -> str:
     return os.getenv("JWT_ALGORITHM", "HS256")
 
 
+def _reset_token_expire_minutes() -> int:
+    value = os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "30")
+    try:
+        minutes = int(value)
+    except ValueError as exc:
+        raise RuntimeError("RESET_TOKEN_EXPIRE_MINUTES must be an integer.") from exc
+
+    if minutes <= 0:
+        raise RuntimeError("RESET_TOKEN_EXPIRE_MINUTES must be greater than zero.")
+
+    return minutes
+
+
+def get_reset_token_expire_minutes() -> int:
+    return _reset_token_expire_minutes()
+
+
+def _reset_token_secret() -> str:
+    return os.getenv("RESET_TOKEN_SECRET_KEY") or _jwt_secret()
+
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -61,6 +82,22 @@ def create_access_token(*, user_id: int, email: str, role: str) -> str:
         "exp": expire,
     }
     return jwt.encode(payload, _jwt_secret(), algorithm=_jwt_algorithm())
+
+
+def create_password_reset_token(*, user_id: int, email: str, token_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=_reset_token_expire_minutes())
+    payload: dict[str, Any] = {
+        "sub": str(user_id),
+        "email": email,
+        "purpose": "reset_password",
+        "jti": token_id,
+        "exp": expire,
+    }
+    return jwt.encode(payload, _reset_token_secret(), algorithm=_jwt_algorithm())
+
+
+def decode_password_reset_token(token: str) -> dict[str, Any]:
+    return jwt.decode(token, _reset_token_secret(), algorithms=[_jwt_algorithm()])
 
 
 def get_current_user(

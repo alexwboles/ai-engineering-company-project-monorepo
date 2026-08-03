@@ -51,6 +51,43 @@ The supplier directory follows this layout:
   - Removes supplier by ID.
   - Returns `404` when not found.
 
+### Authentication and password flows
+
+- `POST /auth/login`
+  - Authenticates a user and returns a bearer JWT.
+- `GET /auth/me`
+  - Returns authenticated user and profile details.
+- `POST /auth/forgot-password`
+  - Body: `{ "email": "user@example.com" }`
+  - Always returns `200` with a generic confirmation message.
+  - If email exists, sends one-time password reset email.
+- `POST /auth/reset-password`
+  - Body: `{ "token": "...", "new_password": "..." }`
+  - Validates signed reset token, expiry, and one-time token usage.
+  - Returns `400` for invalid, expired, or already-used token.
+- `POST /auth/change-password`
+  - Authenticated endpoint.
+  - Body: `{ "current_password": "...", "new_password": "..." }`
+  - Returns `400` when current password does not match.
+
+## Authentication env variables
+
+Add the following values in `.env` based on `.env.example`:
+
+- `JWT_SECRET_KEY`
+- `ACCESS_TOKEN_EXPIRE_MINUTES`
+- `JWT_ALGORITHM`
+- `RESET_TOKEN_EXPIRE_MINUTES`
+- `RESET_TOKEN_SECRET_KEY`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `FRONTEND_RESET_PASSWORD_URL`
+
+`FRONTEND_RESET_PASSWORD_URL` should point to the internal frontend reset route, for example:
+
+- `http://localhost:3000/reset-password` (Backoffice local)
+- `http://localhost:3001/reset-password` (Talent local)
+
 ## Error handling
 
 - Empty upload: `400`

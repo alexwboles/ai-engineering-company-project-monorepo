@@ -12,6 +12,7 @@ dependencies = [
   "passlib[bcrypt]>=1.7.4",
   "email-validator>=2.3.0",
   "bcrypt<4",
+  "resend>=2.4.0",
 ]
 
 [project.scripts]
@@ -23,7 +24,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["routes", "incident_analysis"]
-py-modules = ["seed", "main", "models", "database", "auth_models", "auth_security", "user_service"]
+py-modules = ["seed", "main", "models", "database", "auth_models", "auth_security", "user_service", "email_service"]
 
 [dependency-groups]
 dev = []

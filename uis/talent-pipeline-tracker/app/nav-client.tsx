@@ -8,7 +8,11 @@ export function NavClient() {
   const pathname = usePathname();
   const router = useRouter();
   const token = getStoredToken();
-  const isAuthView = pathname === "/login" || pathname === "/register";
+  const isAuthView =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
 
   if (isAuthView) {
     return (
@@ -30,6 +34,9 @@ export function NavClient() {
       </Link>
       <Link href="/candidates/new" className="rounded-full bg-cyan-100 px-3 py-1 font-medium text-cyan-800 hover:bg-cyan-200">
         Register Candidate
+      </Link>
+      <Link href="/account/change-password" className="rounded-full bg-amber-100 px-3 py-1 font-medium text-amber-800 hover:bg-amber-200">
+        Change Password
       </Link>
       {token ? (
         <button

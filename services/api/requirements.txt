@@ -5,3 +5,4 @@ tinydb==4.8.2
 python-jose[cryptography]>=3.5.0
 passlib[bcrypt]>=1.7.4
 email-validator>=2.2.0
+resend>=2.4.0

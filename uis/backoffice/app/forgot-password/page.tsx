@@ -1,47 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { apiRequest, ApiError } from "@/lib/api-client";
-import { storeToken } from "@/lib/auth-client";
+import { ApiError, apiRequest } from "@/lib/api-client";
 
-type LoginResponse = {
-  access_token: string;
-  token_type: string;
+type MessageResponse = {
+  message: string;
 };
 
-export default function LoginPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const successMessage = searchParams.get("reset") === "success" ? "Password updated. You can sign in now." : "";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setMessage("");
     setSubmitting(true);
 
     try {
-      const result = await apiRequest<LoginResponse>(
-        "/auth/login",
+      const result = await apiRequest<MessageResponse>(
+        "/auth/forgot-password",
         {
           method: "POST",
-          body: JSON.stringify({ email: email.trim(), password }),
+          body: JSON.stringify({ email: email.trim() }),
         },
         { authRequired: false }
       );
 
-      storeToken(result.access_token);
-      router.replace("/");
+      setSubmitted(true);
+      setMessage(result.message || "If that address is registered, you will receive a reset link shortly.");
     } catch (requestError) {
       if (requestError instanceof ApiError) {
         setError(requestError.message);
       } else {
-        setError("Unable to sign in. Please try again.");
+        setError("Unable to process request. Please try again.");
       }
     } finally {
       setSubmitting(false);
@@ -52,8 +48,8 @@ export default function LoginPage() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-700">HealthCore Access</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Login</h1>
-        {successMessage ? <p className="mt-3 text-sm text-emerald-700">{successMessage}</p> : null}
+        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Forgot password</h1>
+        <p className="mt-2 text-sm text-slate-600">Enter your email and we will send a secure reset link.</p>
 
         <form className="mt-5 grid gap-4" onSubmit={onSubmit}>
           <label className="text-sm text-slate-700">
@@ -64,41 +60,26 @@ export default function LoginPage() {
               onChange={(event) => setEmail(event.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
               required
+              disabled={submitted || submitting}
             />
           </label>
-
-          <label className="text-sm text-slate-700">
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-              required
-            />
-          </label>
-
-          <p className="-mt-1 text-right text-sm">
-            <Link href="/forgot-password" className="font-medium text-indigo-700 hover:text-indigo-800">
-              Forgot your password?
-            </Link>
-          </p>
 
           {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+          {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitted || submitting}
             className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:opacity-60"
           >
-            {submitting ? "Signing in..." : "Sign in"}
+            {submitted ? "Request sent" : submitting ? "Sending..." : "Send reset link"}
           </button>
         </form>
 
         <p className="mt-4 text-sm text-slate-600">
-          Need an account?{" "}
-          <Link href="/register" className="font-semibold text-indigo-700 hover:text-indigo-800">
-            Register
+          Remembered it?{" "}
+          <Link href="/login" className="font-semibold text-indigo-700 hover:text-indigo-800">
+            Return to login
           </Link>
         </p>
       </section>

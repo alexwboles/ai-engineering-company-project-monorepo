@@ -168,6 +168,58 @@ class UserService:
 
         return _to_profile_record(profile_id, updated)
 
+    @staticmethod
+    def create_password_reset_token_record(*, token_id: str, user_id: int, expires_at: datetime) -> None:
+        with get_auth_db() as db:
+            tokens = db.table("password_reset_tokens")
+            tokens.insert(
+                {
+                    "token_id": token_id,
+                    "user_id": user_id,
+                    "expires_at": expires_at.isoformat(),
+                    "used": False,
+                }
+            )
+
+    @staticmethod
+    def consume_password_reset_token(*, token_id: str, user_id: int) -> bool:
+        token_query = Query()
+        now = datetime.now(timezone.utc)
+
+        with get_auth_db() as db:
+            tokens = db.table("password_reset_tokens")
+            row = tokens.get((token_query.token_id == token_id) & (token_query.user_id == user_id))
+            if row is None:
+                return False
+
+            if bool(row.get("used", False)):
+                return False
+
+            expires_raw = row.get("expires_at")
+            if not isinstance(expires_raw, str):
+                return False
+
+            try:
+                expires_at = datetime.fromisoformat(expires_raw)
+            except ValueError:
+                return False
+
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+            if expires_at <= now:
+                return False
+
+            tokens.update(
+                {
+                    "used": True,
+                    "used_at": now.isoformat(),
+                },
+                doc_ids=[row.doc_id],
+            )
+
+        return True
+
 
 def _to_user_record(doc_id: int, row: dict[str, object]) -> UserRecord:
     return UserRecord.model_validate(
