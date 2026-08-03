@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { apiRequest, ApiError } from "@/lib/api-client";
 
 type SupplierStatus = "active" | "suspended";
 
@@ -29,8 +30,6 @@ const CATEGORY_OPTIONS: SupplierCategory[] = [
   "it_services",
   "facility_services",
 ];
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 function statusClasses(status: SupplierStatus): string {
   return status === "active"
@@ -72,16 +71,8 @@ export default function SuppliersPage() {
       params.set("category", categoryFilter);
     }
 
-    const url = `${API_BASE_URL}/suppliers${params.toString() ? `?${params.toString()}` : ""}`;
-
     try {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Failed to load suppliers.");
-      }
-
-      const payload = (await response.json()) as Supplier[];
+      const payload = await apiRequest<Supplier[]>(`/suppliers${params.toString() ? `?${params.toString()}` : ""}`);
       setSuppliers(payload);
       setRateInputs(
         payload.reduce<Record<number, string>>((acc, supplier) => {
@@ -90,7 +81,7 @@ export default function SuppliersPage() {
         }, {})
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load suppliers.";
+      const message = error instanceof ApiError ? error.message : "Failed to load suppliers.";
       setListError(message);
     } finally {
       setIsLoading(false);
@@ -129,9 +120,8 @@ export default function SuppliersPage() {
     setFormSubmitting(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers`, {
+      await apiRequest<Supplier>("/suppliers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           country: country.trim().toUpperCase(),
@@ -141,15 +131,10 @@ export default function SuppliersPage() {
         }),
       });
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Unable to create supplier.");
-      }
-
       resetForm();
       await fetchSuppliers();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create supplier.";
+      const message = error instanceof ApiError ? error.message : "Unable to create supplier.";
       setFormError(message);
     } finally {
       setFormSubmitting(false);
@@ -166,22 +151,14 @@ export default function SuppliersPage() {
     setUpdatingIds((current) => [...current, supplierId]);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers/${supplierId}/rate`, {
+      const updated = await apiRequest<Supplier>(`/suppliers/${supplierId}/rate`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rate: proposedRate }),
       });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Unable to update rate.");
-      }
-
-      const updated = (await response.json()) as Supplier;
       setSuppliers((current) => current.map((item) => (item.id === supplierId ? updated : item)));
       setRateInputs((current) => ({ ...current, [supplierId]: updated.rate.toString() }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to update rate.";
+      const message = error instanceof ApiError ? error.message : "Unable to update rate.";
       setListError(message);
     } finally {
       setUpdatingIds((current) => current.filter((id) => id !== supplierId));
@@ -192,21 +169,13 @@ export default function SuppliersPage() {
     setUpdatingIds((current) => [...current, supplierId]);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers/${supplierId}/status`, {
+      const updated = await apiRequest<Supplier>(`/suppliers/${supplierId}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Unable to update status.");
-      }
-
-      const updated = (await response.json()) as Supplier;
       setSuppliers((current) => current.map((item) => (item.id === supplierId ? updated : item)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to update status.";
+      const message = error instanceof ApiError ? error.message : "Unable to update status.";
       setListError(message);
     } finally {
       setUpdatingIds((current) => current.filter((id) => id !== supplierId));
