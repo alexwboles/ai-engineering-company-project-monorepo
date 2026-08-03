@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HealthCore Talent Pipeline",
-  description: "Internal tracker for People & Talent recruitment workflows",
+  title: "HealthCore Backoffice",
+  description: "Internal operations dashboard for HealthCore teams.",
 };
 
 export default function RootLayout({
@@ -29,10 +29,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[var(--background)] text-[var(--foreground)] flex flex-col">
+      <body className="min-h-full flex flex-col">
         <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/85 backdrop-blur">
           <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">HealthCore Talent Pipeline</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">HealthCore Backoffice</p>
             <NavClient />
           </nav>
         </header>

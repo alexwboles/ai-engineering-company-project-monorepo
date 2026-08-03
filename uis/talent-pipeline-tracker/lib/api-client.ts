@@ -1,3 +1,5 @@
+import { clearStoredToken, getStoredToken } from "@/lib/auth-client";
+
 export class ApiError extends Error {
   status: number;
 
@@ -19,16 +21,30 @@ function getBaseUrl() {
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers ?? {});
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const token = getStoredToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
     cache: "no-store",
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearStoredToken();
+      if (typeof window !== "undefined") {
+        window.location.assign("/login");
+      }
+    }
+
     let message = `Request failed (${response.status})`;
 
     try {
