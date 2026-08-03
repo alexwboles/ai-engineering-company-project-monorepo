@@ -110,6 +110,17 @@ Add the following values in `.env` based on `.env.example`:
 - `RESEND_FROM_EMAIL`
 - `FRONTEND_RESET_PASSWORD_URL`
 
+## Telemetry storage
+
+Apply `supabase/migrations/20260803210000_create_telemetry_events.sql` to the
+Supabase project before enabling production telemetry storage. The API reads
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and the optional
+`SUPABASE_TELEMETRY_TABLE` setting. The telemetry endpoint validates events
+individually, inserts valid rows as one PostgREST batch, and returns the
+received, stored, and rejected counts. When Supabase settings are absent, the
+local development process uses an in-memory store instead of sending data
+outside the machine.
+
 `FRONTEND_RESET_PASSWORD_URL` should point to the internal frontend reset route, for example:
 
 - `http://localhost:3000/reset-password` (Backoffice local)

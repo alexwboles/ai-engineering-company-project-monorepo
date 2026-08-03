@@ -29,6 +29,11 @@ except ModuleNotFoundError:
     from routes import auth_router, incidents_router, profiles_router, suppliers_router, telemetry_router, users_router
 
 try:
+    from services.api.telemetry_storage import create_telemetry_store
+except ModuleNotFoundError:
+    from telemetry_storage import create_telemetry_store
+
+try:
     # Works when imported as services.api.main from repository root.
     from services.api.incident_analysis import (
         analyze_incident_rows,
@@ -45,6 +50,7 @@ TELEMETRY_ENDPOINT = os.getenv("TELEMETRY_ENDPOINT", "http://localhost:8000/tele
 
 app = FastAPI(title="HealthCore Incident Analysis API", version="1.0.0")
 app.state.telemetry_endpoint = TELEMETRY_ENDPOINT
+app.state.telemetry_store = create_telemetry_store()
 
 app.add_middleware(
     CORSMiddleware,
