@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { track } from "@/lib/telemetry";
 
 type IncidentStatus = "open" | "in_progress" | "resolved" | "discarded";
 type IncidentOrigin = "customer" | "branch" | "internal";
@@ -237,6 +238,17 @@ export default function IncidentsPage() {
       });
 
       setIncidents((current) => current.map((item) => (item.id === incident.id ? updated : item)));
+      track("incident_status_changed", {
+        incidentId: updated.id,
+        previousStatus,
+        nextStatus: updated.status,
+        origin: updated.origin,
+        category: updated.category,
+        actorRole: "backoffice_operator",
+        timeInPreviousStatusHours: Number(
+          ((new Date(updated.updated_at).getTime() - new Date(incident.updated_at).getTime()) / (1000 * 60 * 60)).toFixed(2)
+        ),
+      });
       await loadSummary();
     } catch {
       setIncidents((current) =>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { apiRequest, ApiError } from "@/lib/api-client";
 import { storeToken } from "@/lib/auth-client";
+import { track } from "@/lib/telemetry";
 
 type TokenResponse = {
   access_token: string;
@@ -55,12 +56,27 @@ export default function RegisterPage() {
           { authRequired: false }
         );
       } catch (registerError) {
+        track("auth_login_failed", {
+          authMethod: "password",
+          clientApp: "backoffice",
+          failureReason: registerError instanceof ApiError && registerError.status === 409 ? "account_exists" : "registration_error",
+          lockoutTriggered: false,
+          attemptCount: 1,
+        });
+
         if (registerError instanceof ApiError) {
           setFieldErrors(registerError.fieldErrors);
         }
         setFormError("Unable to create your account. Please review your details and try again.");
         return;
       }
+
+      track("auth_login_attempted", {
+        authMethod: "password",
+        clientApp: "backoffice",
+        authProvider: "healthcore_api",
+        mfaUsed: false,
+      });
 
       try {
         const loginResult = await apiRequest<TokenResponse>(
@@ -75,6 +91,13 @@ export default function RegisterPage() {
         storeToken(loginResult.access_token);
         router.replace("/");
       } catch {
+        track("auth_login_failed", {
+          authMethod: "password",
+          clientApp: "backoffice",
+          failureReason: "network_error",
+          lockoutTriggered: false,
+          attemptCount: 1,
+        });
         setFormError("Account created, but automatic sign-in failed. Please sign in from the login page.");
       }
     } finally {

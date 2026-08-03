@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthShell } from "@/app/auth-shell";
 import { NavClient } from "@/app/nav-client";
+import { TelemetryProvider } from "@/app/telemetry-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,6 +37,7 @@ export default function RootLayout({
             <NavClient />
           </nav>
         </header>
+        <TelemetryProvider />
         <AuthShell>{children}</AuthShell>
       </body>
     </html>

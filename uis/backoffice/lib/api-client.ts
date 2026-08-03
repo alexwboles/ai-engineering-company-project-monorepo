@@ -1,4 +1,5 @@
 import { clearStoredToken, getStoredToken } from "@/lib/auth-client";
+import { noteTelemetryAuthSessionExpiry, noteTelemetryBackendException, track } from "@/lib/telemetry";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://api:8000";
@@ -109,6 +110,9 @@ export async function apiRequest<T>(
   options: { authRequired?: boolean } = {}
 ): Promise<T> {
   const authRequired = options.authRequired ?? true;
+  const method = (init.method ?? "GET").toUpperCase();
+  const route = path.split("?")[0] || path;
+  const requestStartedAt = performance.now();
 
   let response: Response;
   try {
@@ -121,6 +125,10 @@ export async function apiRequest<T>(
     throw new ApiError("Unable to reach the server. Check your connection and try again.", 0);
   }
 
+  const durationMs = Number((performance.now() - requestStartedAt).toFixed(2));
+  const requestBody = typeof init.body === "string" ? init.body : "";
+  const requestSizeBytes = requestBody ? new Blob([requestBody]).size : undefined;
+
   let payload: unknown = null;
   try {
     payload = await response.json();
@@ -128,12 +136,36 @@ export async function apiRequest<T>(
     payload = null;
   }
 
+  track("api_latency_recorded", {
+    route,
+    method,
+    statusCode: response.status,
+    durationMs,
+    domain:
+      route.startsWith("/auth")
+        ? "auth"
+        : route.startsWith("/suppliers")
+          ? "procurement"
+          : route.startsWith("/api/incidents") || route.startsWith("/incidents")
+            ? "incidents"
+            : route.startsWith("/profiles")
+              ? "accounts"
+              : "operations",
+    requestSizeBytes,
+    responseSizeBytes: payload === null ? undefined : new Blob([JSON.stringify(payload)]).size,
+  });
+
   if (!response.ok) {
     if (response.status === 401) {
       clearStoredToken();
       if (typeof window !== "undefined" && authRequired) {
+        noteTelemetryAuthSessionExpiry();
         window.location.assign("/login");
       }
+    }
+
+    if (response.status >= 500) {
+      noteTelemetryBackendException(method, route, response.status, `${method}:${route}:${response.status}`);
     }
 
     const detail =

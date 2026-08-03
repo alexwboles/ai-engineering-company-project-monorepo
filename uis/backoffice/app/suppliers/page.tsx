@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { apiRequest, ApiError } from "@/lib/api-client";
+import { track } from "@/lib/telemetry";
 
 type SupplierStatus = "active" | "suspended";
 
@@ -143,7 +144,8 @@ export default function SuppliersPage() {
     }
   }
 
-  async function handleRateUpdate(supplierId: number) {
+  async function handleRateUpdate(supplier: Supplier) {
+    const supplierId = supplier.id;
     const proposedRate = Number(rateInputs[supplierId]);
     if (!Number.isFinite(proposedRate) || proposedRate <= 0) {
       setListError("Rate must be greater than zero.");
@@ -159,6 +161,14 @@ export default function SuppliersPage() {
       });
       setSuppliers((current) => current.map((item) => (item.id === supplierId ? updated : item)));
       setRateInputs((current) => ({ ...current, [supplierId]: updated.rate.toString() }));
+      track("supplier_rate_updated", {
+        supplierId: updated.id,
+        previousRate: supplier.rate,
+        newRate: updated.rate,
+        country: updated.country,
+        category: updated.product_categories[0] ?? "facility_services",
+        updatedByRole: "backoffice_operator",
+      });
     } catch {
       setListError("Unable to update the rate. Please try again.");
     } finally {
@@ -388,7 +398,7 @@ export default function SuppliersPage() {
                           />
                           <button
                             className="rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
-                            onClick={() => void handleRateUpdate(supplier.id)}
+                            onClick={() => void handleRateUpdate(supplier)}
                             disabled={isUpdating}
                           >
                             Update

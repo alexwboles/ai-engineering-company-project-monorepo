@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { track } from "@/lib/telemetry";
 
 type ErrorPageProps = {
   error: Error & { digest?: string };
@@ -10,7 +11,14 @@ type ErrorPageProps = {
 
 export default function Error({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    console.error("Unhandled UI error:", error.name);
+    track("frontend_error_occurred", {
+      pageRoute: window.location.pathname,
+      componentName: "error-boundary",
+      errorClass: error.name || "Error",
+      errorFingerprint: `${error.name || "Error"}:${error.digest || error.message}`.toLowerCase().slice(0, 120),
+      recoverable: true,
+      actionTaken: "error_boundary_reset",
+    });
   }, [error]);
 
   return (

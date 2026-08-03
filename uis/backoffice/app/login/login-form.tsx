@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { apiRequest, ApiError } from "@/lib/api-client";
 import { storeToken } from "@/lib/auth-client";
+import { track } from "@/lib/telemetry";
 
 type LoginResponse = {
   access_token: string;
@@ -25,6 +26,13 @@ export function LoginForm() {
     setError("");
     setSubmitting(true);
 
+    track("auth_login_attempted", {
+      authMethod: "password",
+      clientApp: "backoffice",
+      authProvider: "healthcore_api",
+      mfaUsed: false,
+    });
+
     try {
       const result = await apiRequest<LoginResponse>(
         "/auth/login",
@@ -38,6 +46,14 @@ export function LoginForm() {
       storeToken(result.access_token);
       router.replace("/");
     } catch (requestError) {
+      track("auth_login_failed", {
+        authMethod: "password",
+        clientApp: "backoffice",
+        failureReason: requestError instanceof ApiError && requestError.status === 401 ? "invalid_credentials" : "network_error",
+        lockoutTriggered: false,
+        attemptCount: 1,
+      });
+
       if (requestError instanceof ApiError && requestError.status === 401) {
         setError("Invalid email or password. Please try again.");
       } else {

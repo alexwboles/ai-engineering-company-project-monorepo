@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+import os
 from dataclasses import asdict
 from typing import Any
 
@@ -15,10 +16,17 @@ from starlette.requests import Request
 
 try:
     from services.api.auth_security import get_current_user
-    from services.api.routes import auth_router, incidents_router, profiles_router, suppliers_router, users_router
+    from services.api.routes import (
+        auth_router,
+        incidents_router,
+        profiles_router,
+        suppliers_router,
+        telemetry_router,
+        users_router,
+    )
 except ModuleNotFoundError:
     from auth_security import get_current_user
-    from routes import auth_router, incidents_router, profiles_router, suppliers_router, users_router
+    from routes import auth_router, incidents_router, profiles_router, suppliers_router, telemetry_router, users_router
 
 try:
     # Works when imported as services.api.main from repository root.
@@ -33,8 +41,10 @@ except ModuleNotFoundError:
     from incident_analysis import analyze_incident_rows, now_iso, summary_to_csv_text, summary_to_dict
 
 logger = logging.getLogger("healthcore.api")
+TELEMETRY_ENDPOINT = os.getenv("TELEMETRY_ENDPOINT", "http://localhost:8000/telemetry/events")
 
 app = FastAPI(title="HealthCore Incident Analysis API", version="1.0.0")
+app.state.telemetry_endpoint = TELEMETRY_ENDPOINT
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,6 +61,7 @@ app.include_router(users_router)
 app.include_router(profiles_router)
 app.include_router(auth_router)
 app.include_router(incidents_router)
+app.include_router(telemetry_router)
 
 
 @app.exception_handler(RequestValidationError)

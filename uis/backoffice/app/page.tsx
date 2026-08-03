@@ -1,14 +1,19 @@
 import { buildOperationalSnapshot } from "@/lib/operational-snapshot";
+import { DashboardTelemetry } from "@/app/dashboard-telemetry";
 
 function formatPercent(value: number) {
   return `${value.toFixed(2)}%`;
 }
 
 export default function Home() {
-  const snapshot = buildOperationalSnapshot("2025-03-14");
+  const asOfDate = "2025-03-14";
+  const snapshot = buildOperationalSnapshot(asOfDate);
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
+      <DashboardTelemetry
+        asOfDate={asOfDate}
+      />
       <header className="rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-700">HealthCore Backoffice</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Operations Command View</h1>
