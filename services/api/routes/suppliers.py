@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from tinydb import Query
 
 try:
+    from services.api.auth_security import get_current_user
     from services.api.database import get_suppliers_db
     from services.api.models import (
         INITIAL_SUPPLIERS,
@@ -17,6 +18,7 @@ try:
         SupplierStatusUpdate,
     )
 except ModuleNotFoundError:
+    from auth_security import get_current_user
     from database import get_suppliers_db
     from models import (
         INITIAL_SUPPLIERS,
@@ -67,7 +69,8 @@ def seed_suppliers() -> int:
 
 
 @router.post("/suppliers", response_model=SupplierResponse, status_code=201)
-def create_supplier(payload: SupplierCreate) -> SupplierResponse:
+def create_supplier(payload: SupplierCreate, current_user=Depends(get_current_user)) -> SupplierResponse:
+    _ = current_user
     now = _now_utc()
     doc = {
         **payload.model_dump(mode="json"),
@@ -83,8 +86,11 @@ def create_supplier(payload: SupplierCreate) -> SupplierResponse:
 
 @router.get("/suppliers", response_model=list[SupplierResponse])
 def list_suppliers(
-    country: str | None = None, category: ProductCategory | str | None = None
+    country: str | None = None,
+    category: ProductCategory | str | None = None,
+    current_user=Depends(get_current_user),
 ) -> list[SupplierResponse]:
+    _ = current_user
     with get_suppliers_db() as db:
         rows = db.all()
 
@@ -106,7 +112,8 @@ def list_suppliers(
 
 
 @router.get("/suppliers/{supplier_id}", response_model=SupplierResponse)
-def get_supplier(supplier_id: int) -> SupplierResponse:
+def get_supplier(supplier_id: int, current_user=Depends(get_current_user)) -> SupplierResponse:
+    _ = current_user
     with get_suppliers_db() as db:
         row = db.get(doc_id=supplier_id)
 
@@ -117,7 +124,10 @@ def get_supplier(supplier_id: int) -> SupplierResponse:
 
 
 @router.patch("/suppliers/{supplier_id}/rate", response_model=SupplierResponse)
-def update_supplier_rate(supplier_id: int, payload: SupplierRateUpdate) -> SupplierResponse:
+def update_supplier_rate(
+    supplier_id: int, payload: SupplierRateUpdate, current_user=Depends(get_current_user)
+) -> SupplierResponse:
+    _ = current_user
     with get_suppliers_db() as db:
         row = db.get(doc_id=supplier_id)
         if row is None:
@@ -141,7 +151,10 @@ def update_supplier_rate(supplier_id: int, payload: SupplierRateUpdate) -> Suppl
 
 
 @router.patch("/suppliers/{supplier_id}/status", response_model=SupplierResponse)
-def update_supplier_status(supplier_id: int, payload: SupplierStatusUpdate) -> SupplierResponse:
+def update_supplier_status(
+    supplier_id: int, payload: SupplierStatusUpdate, current_user=Depends(get_current_user)
+) -> SupplierResponse:
+    _ = current_user
     with get_suppliers_db() as db:
         row = db.get(doc_id=supplier_id)
         if row is None:
@@ -163,7 +176,8 @@ def update_supplier_status(supplier_id: int, payload: SupplierStatusUpdate) -> S
 
 
 @router.delete("/suppliers/{supplier_id}", status_code=200)
-def delete_supplier(supplier_id: int) -> dict[str, str]:
+def delete_supplier(supplier_id: int, current_user=Depends(get_current_user)) -> dict[str, str]:
+    _ = current_user
     with get_suppliers_db() as db:
         row = db.get(doc_id=supplier_id)
         if row is None:

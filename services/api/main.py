@@ -5,14 +5,16 @@ import io
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 try:
-    from services.api.routes import suppliers_router
+    from services.api.auth_security import get_current_user
+    from services.api.routes import auth_router, profiles_router, suppliers_router, users_router
 except ModuleNotFoundError:
-    from routes import suppliers_router
+    from auth_security import get_current_user
+    from routes import auth_router, profiles_router, suppliers_router, users_router
 
 try:
     # Works when imported as services.api.main from repository root.
@@ -39,6 +41,9 @@ _last_analysis_summary_csv: str | None = None
 _last_analysis_payload: dict[str, Any] | None = None
 
 app.include_router(suppliers_router)
+app.include_router(users_router)
+app.include_router(profiles_router)
+app.include_router(auth_router)
 
 
 @app.get("/health")
@@ -47,7 +52,10 @@ def health() -> dict[str, str]:
 
 
 @app.post("/api/incidents/analyze")
-async def analyze_incidents(file: UploadFile = File(...)) -> dict[str, Any]:
+async def analyze_incidents(
+    file: UploadFile = File(...), current_user=Depends(get_current_user)
+) -> dict[str, Any]:
+    _ = current_user
     global _last_analysis_payload
     global _last_analysis_summary_csv
 
@@ -87,7 +95,8 @@ async def analyze_incidents(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 @app.get("/api/incidents/results/export")
-def export_last_results() -> Response:
+def export_last_results(current_user=Depends(get_current_user)) -> Response:
+    _ = current_user
     if _last_analysis_summary_csv is None:
         raise HTTPException(status_code=404, detail="No analysis available to export yet.")
 
