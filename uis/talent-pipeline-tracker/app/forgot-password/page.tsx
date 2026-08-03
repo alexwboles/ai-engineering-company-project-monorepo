@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { AuthApiError, authApiRequest } from "@/lib/auth-client";
+import { authApiRequest } from "@/lib/auth-client";
 
 type MessageResponse = {
   message: string;
@@ -29,12 +29,8 @@ export default function ForgotPasswordPage() {
 
       setSubmitted(true);
       setMessage(result.message || "If that address is registered, you will receive a reset link shortly.");
-    } catch (requestError) {
-      if (requestError instanceof AuthApiError) {
-        setError(requestError.message);
-      } else {
-        setError("Unable to process request. Please try again.");
-      }
+    } catch {
+      setError("Unable to process your request right now. Please try again, or contact support if it continues.");
     } finally {
       setSubmitting(false);
     }

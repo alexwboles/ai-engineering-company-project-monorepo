@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 from dataclasses import asdict
 from typing import Any
 
@@ -31,6 +32,8 @@ except ModuleNotFoundError:
     # Works when running uvicorn from services/api with module path main:app.
     from incident_analysis import analyze_incident_rows, now_iso, summary_to_csv_text, summary_to_dict
 
+logger = logging.getLogger("healthcore.api")
+
 app = FastAPI(title="HealthCore Incident Analysis API", version="1.0.0")
 
 app.add_middleware(
@@ -54,7 +57,7 @@ app.include_router(incidents_router)
 async def request_validation_exception_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
     details: list[dict[str, object]] = []
     for err in exc.errors():
-        loc = err.get("loc", [])
+        loc = err.get("loc", ())
         field = str(loc[-1]) if loc else "field"
         details.append(
             {
@@ -64,11 +67,12 @@ async def request_validation_exception_handler(_request: Request, exc: RequestVa
             }
         )
 
-    return JSONResponse(status_code=400, content={"detail": details})
+    return JSONResponse(status_code=422, content={"detail": details})
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(_request: Request, _exc: Exception) -> JSONResponse:
+async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled API exception: %s", type(exc).__name__)
     return JSONResponse(
         status_code=500,
         content={"detail": "An unexpected error occurred. Please try again."},
@@ -94,7 +98,12 @@ async def analyze_incidents(
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload a .csv file.")
 
-    content = await file.read()
+    try:
+        content = await file.read()
+    except OSError:
+        logger.exception("Failed to read uploaded CSV file")
+        raise HTTPException(status_code=400, detail="Unable to read the uploaded file.") from None
+
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
@@ -107,9 +116,20 @@ async def analyze_incidents(
         reader = csv.DictReader(io.StringIO(text))
         if reader.fieldnames is None:
             raise ValueError("CSV header row is missing.")
+    except (csv.Error, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to process CSV. Please check the file format and try again.",
+        ) from exc
+
+    try:
         summary, invalid_records, _valid_rows = analyze_incident_rows(reader)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Unable to process CSV: {exc}") from exc
+    except Exception:
+        logger.exception("Incident CSV analysis failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to analyze the uploaded CSV right now. Please try again.",
+        ) from None
 
     payload = {
         "generated_at": now_iso(),
@@ -134,5 +154,3 @@ def export_last_results(current_user=Depends(get_current_user)) -> Response:
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=results.csv"},
     )
-
-

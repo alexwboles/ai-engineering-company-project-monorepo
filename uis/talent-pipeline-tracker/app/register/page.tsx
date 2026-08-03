@@ -38,30 +38,35 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
-      await authApiRequest<UserResponse>("/users", {
-        method: "POST",
-        body: JSON.stringify({
-          email: form.email.trim(),
-          password: form.password,
-          name: form.name.trim() || undefined,
-          phone: form.phone.trim() || undefined,
-          address: form.address.trim() || undefined,
-        }),
-      });
+      try {
+        await authApiRequest<UserResponse>("/users", {
+          method: "POST",
+          body: JSON.stringify({
+            email: form.email.trim(),
+            password: form.password,
+            name: form.name.trim() || undefined,
+            phone: form.phone.trim() || undefined,
+            address: form.address.trim() || undefined,
+          }),
+        });
+      } catch (registerError) {
+        if (registerError instanceof AuthApiError) {
+          setFieldErrors(registerError.fieldErrors);
+        }
+        setFormError("Unable to create your account. Please review your details and try again.");
+        return;
+      }
 
-      const loginResult = await authApiRequest<TokenResponse>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: form.email.trim(), password: form.password }),
-      });
+      try {
+        const loginResult = await authApiRequest<TokenResponse>("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email: form.email.trim(), password: form.password }),
+        });
 
-      storeToken(loginResult.access_token);
-      router.replace("/");
-    } catch (requestError) {
-      if (requestError instanceof AuthApiError) {
-        setFieldErrors(requestError.fieldErrors);
-        setFormError(requestError.message);
-      } else {
-        setFormError("Unable to register. Please try again.");
+        storeToken(loginResult.access_token);
+        router.replace("/");
+      } catch {
+        setFormError("Account created, but automatic sign-in failed. Please sign in from the login page.");
       }
     } finally {
       setSubmitting(false);

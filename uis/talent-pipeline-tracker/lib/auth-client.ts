@@ -25,7 +25,7 @@ export function clearStoredToken(): void {
 }
 
 function getAuthBaseUrl() {
-  return process.env.NEXT_PUBLIC_AUTH_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  return process.env.NEXT_PUBLIC_AUTH_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://api:8000";
 }
 
 export class AuthApiError extends Error {
@@ -53,9 +53,10 @@ function toFieldErrors(detail: unknown): Record<string, string> {
     const loc = Array.isArray((item as { loc?: unknown }).loc)
       ? ((item as { loc?: string[] }).loc as string[])
       : [];
-    const message = typeof (item as { msg?: unknown }).msg === "string"
-      ? ((item as { msg: string }).msg)
-      : "Invalid value.";
+    const message =
+      typeof (item as { msg?: unknown }).msg === "string"
+        ? (item as { msg: string }).msg
+        : "Invalid value.";
 
     const key = loc.length > 0 ? loc[loc.length - 1] : "form";
     acc[key] = message;
@@ -63,15 +64,55 @@ function toFieldErrors(detail: unknown): Record<string, string> {
   }, {});
 }
 
+function isSafeUserMessage(detail: string): boolean {
+  const trimmed = detail.trim();
+  if (!trimmed || trimmed.length > 200) {
+    return false;
+  }
+  if (/traceback|exception|stack|at\s+\w+\.|File "|line \d+/i.test(trimmed)) {
+    return false;
+  }
+  if (/^\s*\{[\s\S]*\}\s*$/.test(trimmed) || /unexpected token/i.test(trimmed)) {
+    return false;
+  }
+  return true;
+}
+
+function toUserFacingAuthMessage(status: number, detail?: unknown): string {
+  if (typeof detail === "string" && isSafeUserMessage(detail)) {
+    return detail;
+  }
+
+  if (status === 400 || status === 422) {
+    return "Please check your input and try again.";
+  }
+  if (status === 401) {
+    return "Invalid email or password.";
+  }
+  if (status === 409) {
+    return "An account with this email already exists.";
+  }
+  if (status >= 500) {
+    return "Something went wrong on our side. Please try again in a moment.";
+  }
+
+  return "Unable to complete the request. Please try again.";
+}
+
 export async function authApiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${getAuthBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getAuthBaseUrl()}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers ?? {}),
+      },
+      cache: "no-store",
+    });
+  } catch {
+    throw new AuthApiError("Unable to reach the server. Check your connection and try again.", 0);
+  }
 
   let payload: unknown = null;
   try {
@@ -81,9 +122,13 @@ export async function authApiRequest<T>(path: string, init: RequestInit = {}): P
   }
 
   if (!response.ok) {
-    const detail = payload && typeof payload === "object" ? (payload as { detail?: unknown }).detail : undefined;
-    const message = typeof detail === "string" ? detail : `Request failed (${response.status})`;
-    throw new AuthApiError(message, response.status, toFieldErrors(detail));
+    const detail =
+      payload && typeof payload === "object" ? (payload as { detail?: unknown }).detail : undefined;
+    throw new AuthApiError(toUserFacingAuthMessage(response.status, detail), response.status, toFieldErrors(detail));
+  }
+
+  if (payload === null) {
+    throw new AuthApiError("Received an unexpected response from the server. Please try again.", response.status);
   }
 
   return payload as T;

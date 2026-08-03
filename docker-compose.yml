@@ -25,10 +25,10 @@ services:
     build:
       context: ./services
       dockerfile: Dockerfile
-    working_dir: /workspace
+    working_dir: /workspace/services/api
     command:
       - uvicorn
-      - services.api.main:app
+      - main:app
       - --host
       - 0.0.0.0
       - --port
@@ -40,6 +40,7 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      PYTHONPATH: /workspace
       RESET_TOKEN_EXPIRE_MINUTES: ${RESET_TOKEN_EXPIRE_MINUTES}
       RESET_TOKEN_SECRET_KEY: ${RESET_TOKEN_SECRET_KEY}
       RESEND_API_KEY: ${RESEND_API_KEY}

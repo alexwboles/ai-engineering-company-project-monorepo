@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CandidateDetailPage } from "@/components/candidate-detail-page";
 import { getRecordById, getRecordNotes } from "@/services/records";
 import type { CandidateNote, CandidateRecord } from "@/types/talent";
@@ -11,6 +11,11 @@ export default function Page({ params }: { params: { id: string } }) {
   const [notes, setNotes] = useState<CandidateNote[]>([]);
   const [initialError, setInitialError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const retry = useCallback(() => {
+    setReloadToken((current) => current + 1);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -20,16 +25,18 @@ export default function Page({ params }: { params: { id: string } }) {
       try {
         const [loadedRecord, loadedNotes] = await Promise.all([getRecordById(id), getRecordNotes(id)]);
         setRecord(loadedRecord);
-        setNotes(loadedNotes);
-      } catch (error) {
-        setInitialError(error instanceof Error ? error.message : "Unable to load candidate details.");
+        setNotes(loadedNotes ?? []);
+      } catch {
+        setRecord(null);
+        setNotes([]);
+        setInitialError("Unable to load candidate details right now.");
       } finally {
         setLoading(false);
       }
     }
 
     void load();
-  }, [id]);
+  }, [id, reloadToken]);
 
   if (loading) {
     return (
@@ -39,5 +46,13 @@ export default function Page({ params }: { params: { id: string } }) {
     );
   }
 
-  return <CandidateDetailPage id={id} initialCandidate={record} initialNotes={notes} initialError={initialError} />;
+  return (
+    <CandidateDetailPage
+      id={id}
+      initialCandidate={record}
+      initialNotes={notes}
+      initialError={initialError}
+      onRetryLoad={retry}
+    />
+  );
 }

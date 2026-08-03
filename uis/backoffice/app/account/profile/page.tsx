@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { apiRequest, ApiError } from "@/lib/api-client";
 
 type Profile = {
@@ -26,34 +26,31 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError("");
-      setMessage("");
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    setMessage("");
 
-      try {
-        const me = await apiRequest<AuthMeResponse>("/auth/me");
-        setEmail(me.email);
-        setRole(me.role);
-        setForm({
-          name: me.profile?.name ?? "",
-          phone: me.profile?.phone ?? "",
-          address: me.profile?.address ?? "",
-        });
-      } catch (requestError) {
-        if (requestError instanceof ApiError) {
-          setError(requestError.message);
-        } else {
-          setError("Unable to load profile.");
-        }
-      } finally {
-        setLoading(false);
-      }
+    try {
+      const me = await apiRequest<AuthMeResponse>("/auth/me");
+      setEmail(me.email ?? "");
+      setRole(me.role ?? "");
+      setForm({
+        name: me.profile?.name ?? "",
+        phone: me.profile?.phone ?? "",
+        address: me.profile?.address ?? "",
+      });
+    } catch {
+      setError("Unable to load your profile right now.");
+    } finally {
+      setLoading(false);
     }
-
-    void load();
   }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,10 +70,10 @@ export default function ProfilePage() {
 
       setMessage("Profile updated successfully.");
     } catch (requestError) {
-      if (requestError instanceof ApiError) {
-        setError(requestError.message);
+      if (requestError instanceof ApiError && Object.keys(requestError.fieldErrors).length > 0) {
+        setError(Object.values(requestError.fieldErrors)[0] ?? "Unable to update profile.");
       } else {
-        setError("Unable to update profile.");
+        setError("Unable to update your profile. Please try again.");
       }
     } finally {
       setSaving(false);
@@ -94,16 +91,27 @@ export default function ProfilePage() {
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         {loading ? (
           <p className="text-sm text-slate-600">Loading profile...</p>
+        ) : error && !email ? (
+          <div className="flex flex-wrap items-center gap-3 text-sm text-rose-700">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded bg-rose-700 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-800"
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <>
             <dl className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
               <div>
                 <dt className="text-xs uppercase tracking-wide text-slate-500">Email</dt>
-                <dd className="font-medium text-slate-900">{email}</dd>
+                <dd className="font-medium text-slate-900">{email || "—"}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-slate-500">Role</dt>
-                <dd className="font-medium text-slate-900">{role}</dd>
+                <dd className="font-medium text-slate-900">{role || "—"}</dd>
               </div>
             </dl>
 

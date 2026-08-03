@@ -80,9 +80,8 @@ export default function SuppliersPage() {
           return acc;
         }, {})
       );
-    } catch (error) {
-      const message = error instanceof ApiError ? error.message : "Failed to load suppliers.";
-      setListError(message);
+    } catch {
+      setListError("Unable to load suppliers right now. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -134,8 +133,11 @@ export default function SuppliersPage() {
       resetForm();
       await fetchSuppliers();
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : "Unable to create supplier.";
-      setFormError(message);
+      if (error instanceof ApiError && Object.keys(error.fieldErrors).length > 0) {
+        setFormError(Object.values(error.fieldErrors)[0] ?? "Unable to create supplier. Please review your input.");
+      } else {
+        setFormError("Unable to create supplier. Please review your input and try again.");
+      }
     } finally {
       setFormSubmitting(false);
     }
@@ -157,9 +159,8 @@ export default function SuppliersPage() {
       });
       setSuppliers((current) => current.map((item) => (item.id === supplierId ? updated : item)));
       setRateInputs((current) => ({ ...current, [supplierId]: updated.rate.toString() }));
-    } catch (error) {
-      const message = error instanceof ApiError ? error.message : "Unable to update rate.";
-      setListError(message);
+    } catch {
+      setListError("Unable to update the rate. Please try again.");
     } finally {
       setUpdatingIds((current) => current.filter((id) => id !== supplierId));
     }
@@ -174,9 +175,8 @@ export default function SuppliersPage() {
         body: JSON.stringify({ status: nextStatus }),
       });
       setSuppliers((current) => current.map((item) => (item.id === supplierId ? updated : item)));
-    } catch (error) {
-      const message = error instanceof ApiError ? error.message : "Unable to update status.";
-      setListError(message);
+    } catch {
+      setListError("Unable to update the status. Please try again.");
     } finally {
       setUpdatingIds((current) => current.filter((id) => id !== supplierId));
     }
@@ -318,7 +318,18 @@ export default function SuppliersPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Suppliers</h2>
 
-        {listError ? <p className="mt-3 text-sm text-rose-700">{listError}</p> : null}
+        {listError ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <p>{listError}</p>
+            <button
+              type="button"
+              onClick={() => void fetchSuppliers()}
+              className="rounded bg-rose-700 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-800"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
 
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -339,6 +350,12 @@ export default function SuppliersPage() {
                     Loading suppliers...
                   </td>
                 </tr>
+              ) : listError ? (
+                <tr>
+                  <td className="py-4" colSpan={6}>
+                    Supplier data is unavailable until the request succeeds.
+                  </td>
+                </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
                   <td className="py-4" colSpan={6}>
@@ -352,7 +369,7 @@ export default function SuppliersPage() {
                     <tr key={supplier.id}>
                       <td className="py-3 font-medium text-slate-900">{supplier.name}</td>
                       <td className="py-3">{supplier.country}</td>
-                      <td className="py-3">{supplier.product_categories.join(", ").replaceAll("_", " ")}</td>
+                      <td className="py-3">{supplier.product_categories?.join(", ").replaceAll("_", " ") ?? "—"}</td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           <input
@@ -397,7 +414,11 @@ export default function SuppliersPage() {
                           </select>
                         </div>
                       </td>
-                      <td className="py-3">{new Date(supplier.last_rate_update_date).toLocaleDateString()}</td>
+                      <td className="py-3">
+                        {supplier.last_rate_update_date
+                          ? new Date(supplier.last_rate_update_date).toLocaleDateString()
+                          : "—"}
+                      </td>
                     </tr>
                   );
                 })

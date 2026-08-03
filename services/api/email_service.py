@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
 
 import resend
+
+logger = logging.getLogger("healthcore.email")
 
 
 def _resend_api_key() -> str:
@@ -14,7 +17,7 @@ def _resend_from_email() -> str:
 
 
 def _frontend_reset_password_url() -> str:
-    return os.getenv("FRONTEND_RESET_PASSWORD_URL", "http://localhost:3000/reset-password").strip()
+    return os.getenv("FRONTEND_RESET_PASSWORD_URL", "http://localhost:3001/reset-password").strip()
 
 
 def build_reset_password_link(token: str) -> str:
@@ -27,7 +30,7 @@ def send_password_reset_email(*, recipient_email: str, reset_token: str) -> bool
     api_key = _resend_api_key()
     from_email = _resend_from_email()
     if not api_key or not from_email:
-        # Keep auth flow safe in local/dev when email is not configured.
+        logger.warning("Password reset email skipped: RESEND_API_KEY or RESEND_FROM_EMAIL is not configured.")
         return False
 
     reset_link = build_reset_password_link(reset_token)
@@ -67,4 +70,5 @@ def send_password_reset_email(*, recipient_email: str, reset_token: str) -> bool
         )
         return True
     except Exception:
+        logger.exception("Failed to send password reset email via Resend")
         return False

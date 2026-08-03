@@ -130,13 +130,18 @@ def analyze_incident_rows(rows: Iterable[dict[str, str]]) -> tuple[AnalysisSumma
 def load_and_analyze_csv(csv_path: str | Path) -> tuple[AnalysisSummary, list[InvalidRecord], list[dict[str, str]]]:
     path = Path(csv_path)
     if not path.exists():
-        raise FileNotFoundError(f"CSV file not found: {path}")
+        raise FileNotFoundError(f"CSV file not found: {path.name}")
 
-    with path.open("r", newline="", encoding="utf-8-sig") as handle:
-        reader = csv.DictReader(handle)
-        if reader.fieldnames is None:
-            raise ValueError("CSV file is missing a header row.")
-        return analyze_incident_rows(reader)
+    try:
+        with path.open("r", newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                raise ValueError("CSV file is missing a header row.")
+            return analyze_incident_rows(reader)
+    except UnicodeDecodeError:
+        raise
+    except OSError as exc:
+        raise OSError(f"Unable to read CSV file: {path.name}") from exc
 
 
 def summary_to_dict(summary: AnalysisSummary) -> dict[str, object]:

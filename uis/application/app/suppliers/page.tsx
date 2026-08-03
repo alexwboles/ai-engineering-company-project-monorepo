@@ -30,7 +30,8 @@ const CATEGORY_OPTIONS: SupplierCategory[] = [
   "facility_services",
 ];
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://api:8000";
 
 function statusClasses(status: SupplierStatus): string {
   return status === "active"
@@ -77,21 +78,25 @@ export default function SuppliersPage() {
     try {
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Failed to load suppliers.");
+        throw new Error("Unable to load suppliers right now. Please try again.");
       }
 
-      const payload = (await response.json()) as Supplier[];
-      setSuppliers(payload);
+      let payload: Supplier[];
+      try {
+        payload = (await response.json()) as Supplier[];
+      } catch {
+        throw new Error("Unable to load suppliers right now. Please try again.");
+      }
+
+      setSuppliers(payload ?? []);
       setRateInputs(
-        payload.reduce<Record<number, string>>((acc, supplier) => {
-          acc[supplier.id] = supplier.rate.toString();
+        (payload ?? []).reduce<Record<number, string>>((acc, supplier) => {
+          acc[supplier.id] = supplier.rate?.toString() ?? "";
           return acc;
         }, {})
       );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load suppliers.";
-      setListError(message);
+    } catch {
+      setListError("Unable to load suppliers right now. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -142,15 +147,13 @@ export default function SuppliersPage() {
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Unable to create supplier.");
+        throw new Error("Unable to create supplier. Please review your input and try again.");
       }
 
       resetForm();
       await fetchSuppliers();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create supplier.";
-      setFormError(message);
+    } catch {
+      setFormError("Unable to create supplier. Please review your input and try again.");
     } finally {
       setFormSubmitting(false);
     }
@@ -173,16 +176,20 @@ export default function SuppliersPage() {
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Unable to update rate.");
+        throw new Error("Unable to update the rate. Please try again.");
       }
 
-      const updated = (await response.json()) as Supplier;
+      let updated: Supplier;
+      try {
+        updated = (await response.json()) as Supplier;
+      } catch {
+        throw new Error("Unable to update the rate. Please try again.");
+      }
+
       setSuppliers((current) => current.map((item) => (item.id === supplierId ? updated : item)));
-      setRateInputs((current) => ({ ...current, [supplierId]: updated.rate.toString() }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to update rate.";
-      setListError(message);
+      setRateInputs((current) => ({ ...current, [supplierId]: updated.rate?.toString() ?? "" }));
+    } catch {
+      setListError("Unable to update the rate. Please try again.");
     } finally {
       setUpdatingIds((current) => current.filter((id) => id !== supplierId));
     }
@@ -199,15 +206,19 @@ export default function SuppliersPage() {
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Unable to update status.");
+        throw new Error("Unable to update the status. Please try again.");
       }
 
-      const updated = (await response.json()) as Supplier;
+      let updated: Supplier;
+      try {
+        updated = (await response.json()) as Supplier;
+      } catch {
+        throw new Error("Unable to update the status. Please try again.");
+      }
+
       setSuppliers((current) => current.map((item) => (item.id === supplierId ? updated : item)));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to update status.";
-      setListError(message);
+    } catch {
+      setListError("Unable to update the status. Please try again.");
     } finally {
       setUpdatingIds((current) => current.filter((id) => id !== supplierId));
     }
@@ -349,7 +360,18 @@ export default function SuppliersPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Suppliers</h2>
 
-        {listError ? <p className="mt-3 text-sm text-rose-700">{listError}</p> : null}
+        {listError ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <p>{listError}</p>
+            <button
+              type="button"
+              onClick={() => void fetchSuppliers()}
+              className="rounded bg-rose-700 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-800"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
 
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -370,6 +392,12 @@ export default function SuppliersPage() {
                     Loading suppliers...
                   </td>
                 </tr>
+              ) : listError ? (
+                <tr>
+                  <td className="py-4" colSpan={6}>
+                    Supplier data is unavailable until the request succeeds.
+                  </td>
+                </tr>
               ) : suppliers.length === 0 ? (
                 <tr>
                   <td className="py-4" colSpan={6}>
@@ -383,7 +411,7 @@ export default function SuppliersPage() {
                     <tr key={supplier.id}>
                       <td className="py-3 font-medium text-slate-900">{supplier.name}</td>
                       <td className="py-3">{supplier.country}</td>
-                      <td className="py-3">{supplier.product_categories.join(", ").replaceAll("_", " ")}</td>
+                      <td className="py-3">{supplier.product_categories?.join(", ").replaceAll("_", " ") ?? "—"}</td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           <input
@@ -428,7 +456,11 @@ export default function SuppliersPage() {
                           </select>
                         </div>
                       </td>
-                      <td className="py-3">{new Date(supplier.last_rate_update_date).toLocaleDateString()}</td>
+                      <td className="py-3">
+                        {supplier.last_rate_update_date
+                          ? new Date(supplier.last_rate_update_date).toLocaleDateString()
+                          : "—"}
+                      </td>
                     </tr>
                   );
                 })

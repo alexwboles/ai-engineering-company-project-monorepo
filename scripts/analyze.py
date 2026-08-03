@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import sys
 from pathlib import Path
@@ -56,39 +57,62 @@ def format_summary(summary: dict[str, object], invalid_preview: list[dict[str, o
     return "\n".join(lines)
 
 
-def verify_against_expected(summary: dict[str, object], expected_path: Path) -> None:
+def verify_against_expected(summary: dict[str, object], expected_path: Path) -> int:
     if not expected_path.exists():
-        print(f"Expected-values file not found at {expected_path}. Verification skipped.")
-        return
+        print(f"Expected-values file not found at {expected_path.name}. Verification skipped.", file=sys.stderr)
+        return 0
 
-    with expected_path.open("r", encoding="utf-8") as handle:
-        expected = json.load(handle)
+    try:
+        with expected_path.open("r", encoding="utf-8") as handle:
+            expected = json.load(handle)
+    except OSError as exc:
+        print(f"Error: Unable to read expected values file ({exc.strerror}).", file=sys.stderr)
+        return 1
+    except json.JSONDecodeError:
+        print("Error: Expected values file is not valid JSON.", file=sys.stderr)
+        return 1
 
     mismatches: list[str] = []
     for key, expected_value in expected.items():
         if summary.get(key) != expected_value:
-            mismatches.append(
-                f"{key}: expected={expected_value!r}, actual={summary.get(key)!r}"
-            )
+            mismatches.append(f"{key}: expected={expected_value!r}, actual={summary.get(key)!r}")
 
     if mismatches:
-        print("Verification result: FAILED")
+        print("Verification result: FAILED", file=sys.stderr)
         for mismatch in mismatches:
-            print(f"  - {mismatch}")
-    else:
-        print("Verification result: OK (matches expected values)")
+            print(f"  - {mismatch}", file=sys.stderr)
+        return 1
+
+    print("Verification result: OK (matches expected values)")
+    return 0
 
 
 def main() -> int:
     if len(sys.argv) != 2:
-        print("Usage: python analyze.py <path-to-incidents-csv>")
+        print("Usage: python analyze.py <path-to-incidents-csv>", file=sys.stderr)
         return 1
 
-    csv_path = Path(sys.argv[1]).resolve()
+    csv_path = Path(sys.argv[1])
+    if not csv_path.exists():
+        print(f"Error: CSV file not found: {csv_path.name}", file=sys.stderr)
+        return 1
+
     try:
         summary, invalid_records, _valid_rows = load_and_analyze_csv(csv_path)
-    except Exception as exc:
-        print(f"Error: {exc}")
+    except FileNotFoundError:
+        print(f"Error: CSV file not found: {csv_path.name}", file=sys.stderr)
+        return 1
+    except UnicodeDecodeError:
+        print("Error: CSV must be UTF-8 encoded.", file=sys.stderr)
+        return 1
+    except (csv.Error, ValueError) as exc:
+        print(f"Error: Unable to parse CSV ({exc}).", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"Error: Unable to read CSV ({exc.strerror}).", file=sys.stderr)
+        return 1
+    except Exception:
+        print("Error: Unexpected failure while analyzing the CSV.", file=sys.stderr)
         return 1
 
     summary_dict = summary_to_dict(summary)
@@ -103,17 +127,25 @@ def main() -> int:
     ]
 
     print(format_summary(summary_dict, invalid_preview))
-    verify_against_expected(summary_dict, DEFAULT_EXPECTED_RESULTS_PATH)
+    verification_status = verify_against_expected(summary_dict, DEFAULT_EXPECTED_RESULTS_PATH)
 
-    choice = input("Export results to CSV? [y / n]: ").strip().lower()
+    try:
+        choice = input("Export results to CSV? [y / n]: ").strip().lower()
+    except EOFError:
+        choice = "n"
+
     if choice == "y":
         output_path = ROOT / "scripts" / "results.csv"
-        output_path.write_text(summary_to_csv_text(summary), encoding="utf-8")
-        print(f"Results saved to {output_path}")
+        try:
+            output_path.write_text(summary_to_csv_text(summary), encoding="utf-8")
+        except OSError as exc:
+            print(f"Error: Unable to write results CSV ({exc.strerror}).", file=sys.stderr)
+            return 1
+        print(f"Results saved to {output_path.name}")
     else:
         print("Export skipped.")
 
-    return 0
+    return verification_status
 
 
 if __name__ == "__main__":

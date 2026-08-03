@@ -114,7 +114,12 @@ def get_current_user(
         if subject is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token.")
         user_id = int(subject)
-    except (JWTError, ValueError, RuntimeError):
+    except RuntimeError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication is temporarily unavailable. Please try again later.",
+        )
+    except (JWTError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token.")
 
     user = UserService.get_user_by_id(user_id)

@@ -43,10 +43,10 @@ export default function ChangePasswordPage() {
       setNewPassword("");
       setConfirmPassword("");
     } catch (requestError) {
-      if (requestError instanceof ApiError) {
-        setError(requestError.message);
+      if (requestError instanceof ApiError && requestError.status === 400) {
+        setError("Current password is incorrect. Please try again.");
       } else {
-        setError("Unable to change password right now.");
+        setError("Unable to change password right now. Please try again, or contact support.");
       }
     } finally {
       setSaving(false);

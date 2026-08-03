@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -51,6 +52,8 @@ except ModuleNotFoundError:
     from email_service import send_password_reset_email
     from user_service import UserService
 
+logger = logging.getLogger("healthcore.auth")
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 RESET_PASSWORD_CONFIRMATION_MESSAGE = "If that address is registered, you will receive a reset link shortly."
 
@@ -85,10 +88,12 @@ def forgot_password(payload: ForgotPasswordRequest) -> MessageResponse:
             token = create_password_reset_token(user_id=user.id, email=user.email, token_id=token_id)
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=get_reset_token_expire_minutes())
             UserService.create_password_reset_token_record(token_id=token_id, user_id=user.id, expires_at=expires_at)
-            send_password_reset_email(recipient_email=user.email, reset_token=token)
         except Exception:
-            # Keep response constant to avoid user enumeration.
-            pass
+            logger.exception("Failed to create password reset token")
+        else:
+            email_sent = send_password_reset_email(recipient_email=user.email, reset_token=token)
+            if not email_sent:
+                logger.error("Password reset email was not sent for user_id=%s", user.id)
 
     return MessageResponse(message=RESET_PASSWORD_CONFIRMATION_MESSAGE)
 
