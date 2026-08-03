@@ -39,38 +39,43 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
-      await apiRequest<UserResponse>(
-        "/users",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            email: form.email.trim(),
-            password: form.password,
-            name: form.name.trim() || undefined,
-            phone: form.phone.trim() || undefined,
-            address: form.address.trim() || undefined,
-          }),
-        },
-        { authRequired: false }
-      );
+      try {
+        await apiRequest<UserResponse>(
+          "/users",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              email: form.email.trim(),
+              password: form.password,
+              name: form.name.trim() || undefined,
+              phone: form.phone.trim() || undefined,
+              address: form.address.trim() || undefined,
+            }),
+          },
+          { authRequired: false }
+        );
+      } catch (registerError) {
+        if (registerError instanceof ApiError) {
+          setFieldErrors(registerError.fieldErrors);
+        }
+        setFormError("Unable to create your account. Please review your details and try again.");
+        return;
+      }
 
-      const loginResult = await apiRequest<TokenResponse>(
-        "/auth/login",
-        {
-          method: "POST",
-          body: JSON.stringify({ email: form.email.trim(), password: form.password }),
-        },
-        { authRequired: false }
-      );
+      try {
+        const loginResult = await apiRequest<TokenResponse>(
+          "/auth/login",
+          {
+            method: "POST",
+            body: JSON.stringify({ email: form.email.trim(), password: form.password }),
+          },
+          { authRequired: false }
+        );
 
-      storeToken(loginResult.access_token);
-      router.replace("/");
-    } catch (requestError) {
-      if (requestError instanceof ApiError) {
-        setFieldErrors(requestError.fieldErrors);
-        setFormError(requestError.message);
-      } else {
-        setFormError("Unable to register. Please try again.");
+        storeToken(loginResult.access_token);
+        router.replace("/");
+      } catch {
+        setFormError("Account created, but automatic sign-in failed. Please sign in from the login page.");
       }
     } finally {
       setSubmitting(false);
@@ -135,7 +140,23 @@ export default function RegisterPage() {
             />
           </label>
 
-          {formError ? <p className="text-sm text-rose-700">{formError}</p> : null}
+          {formError ? (
+            <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              <p>{formError}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setFormError("")}
+                  className="rounded bg-rose-700 px-3 py-1 text-white hover:bg-rose-800"
+                >
+                  Retry
+                </button>
+                <Link href="/login" className="underline underline-offset-2">
+                  Back to login
+                </Link>
+              </div>
+            </div>
+          ) : null}
 
           <button
             type="submit"

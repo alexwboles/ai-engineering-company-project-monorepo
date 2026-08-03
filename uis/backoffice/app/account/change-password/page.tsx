@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { ApiError, apiRequest } from "@/lib/api-client";
 
 type MessageResponse = {
@@ -43,10 +44,10 @@ export default function ChangePasswordPage() {
       setNewPassword("");
       setConfirmPassword("");
     } catch (requestError) {
-      if (requestError instanceof ApiError) {
-        setError(requestError.message);
+      if (requestError instanceof ApiError && requestError.status === 400) {
+        setError("Current password is incorrect. Please try again.");
       } else {
-        setError("Unable to change password right now.");
+        setError("Unable to change password right now. Please try again, or contact support.");
       }
     } finally {
       setSaving(false);
@@ -96,7 +97,23 @@ export default function ChangePasswordPage() {
             />
           </label>
 
-          {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+          {error ? (
+            <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              <p>{error}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setError("")}
+                  className="rounded bg-rose-700 px-3 py-1 text-white hover:bg-rose-800"
+                >
+                  Retry
+                </button>
+                <Link href="/" className="underline underline-offset-2">
+                  Back to home
+                </Link>
+              </div>
+            </div>
+          ) : null}
           {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
 
           <button

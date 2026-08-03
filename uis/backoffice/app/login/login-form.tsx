@@ -1,40 +1,48 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { apiRequest } from "@/lib/api-client";
+import { apiRequest, ApiError } from "@/lib/api-client";
+import { storeToken } from "@/lib/auth-client";
 
-type MessageResponse = {
-  message: string;
+type LoginResponse = {
+  access_token: string;
+  token_type: string;
 };
 
-export default function ForgotPasswordPage() {
+export function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [message, setMessage] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const successMessage = searchParams.get("reset") === "success" ? "Password updated. You can sign in now." : "";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setMessage("");
     setSubmitting(true);
 
     try {
-      const result = await apiRequest<MessageResponse>(
-        "/auth/forgot-password",
+      const result = await apiRequest<LoginResponse>(
+        "/auth/login",
         {
           method: "POST",
-          body: JSON.stringify({ email: email.trim() }),
+          body: JSON.stringify({ email: email.trim(), password }),
         },
         { authRequired: false }
       );
 
-      setSubmitted(true);
-      setMessage(result.message || "If that address is registered, you will receive a reset link shortly.");
-    } catch {
-      setError("Unable to process your request right now. Please try again, or contact support if it continues.");
+      storeToken(result.access_token);
+      router.replace("/");
+    } catch (requestError) {
+      if (requestError instanceof ApiError && requestError.status === 401) {
+        setError("Invalid email or password. Please try again.");
+      } else {
+        setError("Unable to sign in right now. Please try again, or contact support if the problem continues.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -44,8 +52,8 @@ export default function ForgotPasswordPage() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-700">HealthCore Access</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Forgot password</h1>
-        <p className="mt-2 text-sm text-slate-600">Enter your email and we will send a secure reset link.</p>
+        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Login</h1>
+        {successMessage ? <p className="mt-3 text-sm text-emerald-700">{successMessage}</p> : null}
 
         <form className="mt-5 grid gap-4" onSubmit={onSubmit}>
           <label className="text-sm text-slate-700">
@@ -56,9 +64,25 @@ export default function ForgotPasswordPage() {
               onChange={(event) => setEmail(event.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
               required
-              disabled={submitted || submitting}
             />
           </label>
+
+          <label className="text-sm text-slate-700">
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+              required
+            />
+          </label>
+
+          <p className="-mt-1 text-right text-sm">
+            <Link href="/forgot-password" className="font-medium text-indigo-700 hover:text-indigo-800">
+              Forgot your password?
+            </Link>
+          </p>
 
           {error ? (
             <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -71,27 +95,26 @@ export default function ForgotPasswordPage() {
                 >
                   Retry
                 </button>
-                <Link href="/login" className="underline underline-offset-2">
-                  Back to login
+                <Link href="/forgot-password" className="underline underline-offset-2">
+                  Reset password
                 </Link>
               </div>
             </div>
           ) : null}
-          {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
 
           <button
             type="submit"
-            disabled={submitted || submitting}
+            disabled={submitting}
             className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:opacity-60"
           >
-            {submitted ? "Request sent" : submitting ? "Sending..." : "Send reset link"}
+            {submitting ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
         <p className="mt-4 text-sm text-slate-600">
-          Remembered it?{" "}
-          <Link href="/login" className="font-semibold text-indigo-700 hover:text-indigo-800">
-            Return to login
+          Need an account?{" "}
+          <Link href="/register" className="font-semibold text-indigo-700 hover:text-indigo-800">
+            Register
           </Link>
         </p>
       </section>
