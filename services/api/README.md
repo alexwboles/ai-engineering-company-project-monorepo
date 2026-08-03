@@ -121,6 +121,15 @@ received, stored, and rejected counts. When Supabase settings are absent, the
 local development process uses an in-memory store instead of sending data
 outside the machine.
 
+## Technical telemetry report
+
+`GET /telemetry/report` returns the UTC-bounded technical report. Without
+query parameters it covers the previous seven days; `start_date` and
+`end_date` accept ISO 8601 dates or timestamps, with an inclusive start and
+exclusive end. The response includes daily event volume, event volume by
+type, error rate by type, latency by route, and authentication failure rate.
+Results for the same window are cached in memory for 60 seconds.
+
 `FRONTEND_RESET_PASSWORD_URL` should point to the internal frontend reset route, for example:
 
 - `http://localhost:3000/reset-password` (Backoffice local)

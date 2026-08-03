@@ -22,11 +22,20 @@ try:
         profiles_router,
         suppliers_router,
         telemetry_router,
+        telemetry_report_router,
         users_router,
     )
 except ModuleNotFoundError:
     from auth_security import get_current_user
-    from routes import auth_router, incidents_router, profiles_router, suppliers_router, telemetry_router, users_router
+    from routes import (
+        auth_router,
+        incidents_router,
+        profiles_router,
+        suppliers_router,
+        telemetry_report_router,
+        telemetry_router,
+        users_router,
+    )
 
 try:
     from services.api.telemetry_storage import create_telemetry_store
@@ -51,6 +60,7 @@ TELEMETRY_ENDPOINT = os.getenv("TELEMETRY_ENDPOINT", "http://localhost:8000/tele
 app = FastAPI(title="HealthCore Incident Analysis API", version="1.0.0")
 app.state.telemetry_endpoint = TELEMETRY_ENDPOINT
 app.state.telemetry_store = create_telemetry_store()
+app.state.telemetry_reader = app.state.telemetry_store
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,6 +78,7 @@ app.include_router(profiles_router)
 app.include_router(auth_router)
 app.include_router(incidents_router)
 app.include_router(telemetry_router)
+app.include_router(telemetry_report_router)
 
 
 @app.exception_handler(RequestValidationError)

@@ -38,6 +38,9 @@ export function NavClient() {
       <Link href="/incidents" className="rounded-full bg-cyan-100 px-3 py-1 font-medium text-cyan-800 hover:bg-cyan-200">
         Incidents
       </Link>
+      <Link href="/telemetry" className="rounded-full bg-slate-900 px-3 py-1 font-medium text-white hover:bg-slate-700">
+        Telemetry
+      </Link>
       <Link href="/account/profile" className="rounded-full bg-indigo-100 px-3 py-1 font-medium text-indigo-800 hover:bg-indigo-200">
         Profile
       </Link>
