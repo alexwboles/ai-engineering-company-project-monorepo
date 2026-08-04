@@ -247,6 +247,14 @@ Prefect deployment concurrency is limited to one active run for a given `month_s
 1. **`monthly_clinic_supply_performance_flow`**: scheduled on the first working day, targets the previous UTC month, and produces the board-ready report.
 2. **`monthly_clinic_supply_backfill_flow`**: manually invoked with `month_start`, reruns a historical month after late events or a corrected source record.
 
+The implementation composes those entry flows from three reusable subflows:
+
+1. **`extract_monthly_clinic_supply_events_flow`**: reads the bounded `telemetry_events` source window.
+2. **`transform_monthly_clinic_supply_performance_flow`**: validates, deduplicates, and aggregates the four clinic supply KPIs.
+3. **`load_monthly_clinic_supply_performance_flow`**: transactionally publishes the result to `reporting.monthly_clinic_supply_performance`.
+
+The optional `publish_business_performance_notification_flow` is invoked with `return_state=True`, so a notification outage cannot block a completed KPI load.
+
 Both flows call the same tasks and publish the same table contract. The difference is trigger metadata and the requested period, not business logic.
 
 ### Tasks
@@ -315,3 +323,5 @@ This design follows the HealthCore business-performance context for the data-pip
 ## Implementation Command
 
 From the repository root, run `uv run --project services/api python data/pipelines/pipeline.py`. If the `services/api` virtual environment is activated, `python data/pipelines/pipeline.py` runs the same flow. The scheduled deployment targets the previous complete UTC calendar month on the first working day; `--month-start YYYY-MM-01` is available for a manual backfill.
+
+The transformation tests run from the repository root with `uv run --project services/api python -m pytest tests/pipelines/test_pipeline.py`. With `services/api/.venv` activated, the equivalent command is `python -m pytest tests/pipelines/test_pipeline.py`.

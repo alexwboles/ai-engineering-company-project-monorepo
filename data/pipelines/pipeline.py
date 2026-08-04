@@ -750,6 +750,53 @@ def publish_run_notification(summary: dict[str, Any]) -> dict[str, str]:
     return {"status": "sent"}
 
 
+@flow(name="extract_monthly_clinic_supply_events_flow")
+def extract_monthly_clinic_supply_events_flow(
+    settings: PipelineSettings, month_start: str
+) -> list[dict[str, Any]]:
+    """Extract the bounded source events for one UTC reporting month."""
+
+    return extract_monthly_supply_events(settings, month_start)
+
+
+@flow(name="transform_monthly_clinic_supply_performance_flow")
+def transform_monthly_clinic_supply_performance_flow(
+    raw_rows: list[dict[str, Any]], month_start: str
+) -> dict[str, Any]:
+    """Validate, deduplicate, and aggregate the four HealthCore KPIs."""
+
+    validation_result = validate_and_deduplicate_supply_events(raw_rows, month_start)
+    aggregate_result = aggregate_monthly_clinic_supply_metrics(validation_result, month_start)
+    return {
+        "validation": validation_result,
+        "aggregate": aggregate_result,
+    }
+
+
+@flow(name="load_monthly_clinic_supply_performance_flow")
+def load_monthly_clinic_supply_performance_flow(
+    settings: PipelineSettings,
+    run_id: str,
+    validation_result: dict[str, Any],
+    aggregate_result: dict[str, Any],
+) -> dict[str, int]:
+    """Publish the monthly clinic KPI rows transactionally and idempotently."""
+
+    return publish_monthly_clinic_supply_performance(
+        settings,
+        run_id,
+        validation_result,
+        aggregate_result,
+    )
+
+
+@flow(name="publish_business_performance_notification_flow")
+def publish_business_performance_notification_flow(summary: dict[str, Any]) -> dict[str, str]:
+    """Send the optional notification without coupling it to KPI delivery."""
+
+    return publish_run_notification(summary)
+
+
 def _run_pipeline(month_start: str | None, trigger_type: str) -> dict[str, Any]:
     settings = PipelineSettings.from_environment()
     target_month = _month_start(month_start).isoformat()
@@ -763,7 +810,7 @@ def _run_pipeline(month_start: str | None, trigger_type: str) -> dict[str, Any]:
     published = 0
 
     try:
-        raw_rows = extract_monthly_supply_events(settings, target_month)
+        raw_rows = extract_monthly_clinic_supply_events_flow(settings, target_month)
         source_max_timestamp = _source_max_timestamp(raw_rows)
         run_record = record_pipeline_checkpoint(
             settings,
@@ -775,8 +822,9 @@ def _run_pipeline(month_start: str | None, trigger_type: str) -> dict[str, Any]:
             records_rejected=0,
             source_max_timestamp=source_max_timestamp,
         )
-        validation_result = validate_and_deduplicate_supply_events(raw_rows, target_month)
-        aggregate_result = aggregate_monthly_clinic_supply_metrics(validation_result, target_month)
+        transformation_result = transform_monthly_clinic_supply_performance_flow(raw_rows, target_month)
+        validation_result = transformation_result["validation"]
+        aggregate_result = transformation_result["aggregate"]
         run_record = record_pipeline_checkpoint(
             settings,
             run_record,
@@ -787,7 +835,7 @@ def _run_pipeline(month_start: str | None, trigger_type: str) -> dict[str, Any]:
             records_rejected=validation_result.get("records_rejected", 0),
             source_max_timestamp=source_max_timestamp,
         )
-        publish_result = publish_monthly_clinic_supply_performance(
+        publish_result = load_monthly_clinic_supply_performance_flow(
             settings,
             run_id,
             validation_result,
@@ -830,14 +878,14 @@ def _run_pipeline(month_start: str | None, trigger_type: str) -> dict[str, Any]:
             error_code=_safe_error_code(exc),
         )
         try:
-            publish_run_notification(completed, return_state=True)
+            publish_business_performance_notification_flow(completed, return_state=True)
         except Exception:
             LOGGER.warning("Optional failure notification could not be submitted")
         raise
 
     # Optional notification is deliberately state-returning so a failed alert
     # cannot interrupt a successfully published business report.
-    notification_state = publish_run_notification(completed, return_state=True)
+    notification_state = publish_business_performance_notification_flow(completed, return_state=True)
     if hasattr(notification_state, "is_failed") and notification_state.is_failed():
         LOGGER.warning("Optional pipeline notification failed; report remains completed")
     return completed
