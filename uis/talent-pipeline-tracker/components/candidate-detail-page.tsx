@@ -25,13 +25,24 @@ type Props = {
   initialCandidate: CandidateRecord | null;
   initialNotes: CandidateNote[];
   initialError?: string | null;
+  onRetryLoad?: () => void;
 };
 
 function toReadableDate(value: string) {
-  return new Date(value).toLocaleDateString();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "—";
+  }
+  return parsed.toLocaleDateString();
 }
 
-export function CandidateDetailPage({ id, initialCandidate, initialNotes, initialError = null }: Props) {
+export function CandidateDetailPage({
+  id,
+  initialCandidate,
+  initialNotes,
+  initialError = null,
+  onRetryLoad,
+}: Props) {
   const [candidate, setCandidate] = useState<CandidateRecord | null>(initialCandidate);
   const [notes, setNotes] = useState<CandidateNote[]>(initialNotes);
   const [noteContent, setNoteContent] = useState("");
@@ -39,12 +50,15 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
   const [error] = useState<string | null>(initialError);
 
   const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState(false);
   const [stageFeedback, setStageFeedback] = useState<string | null>(null);
+  const [stageError, setStageError] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingStage, setIsUpdatingStage] = useState(false);
 
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [noteFeedback, setNoteFeedback] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState(false);
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
   const handleStatusChange = async (nextStatus: string) => {
@@ -54,13 +68,15 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
 
     setIsUpdatingStatus(true);
     setStatusFeedback(null);
+    setStatusError(false);
 
     try {
       const updated = await patchRecord(id, { status: nextStatus as (typeof STATUS_OPTIONS)[number] });
       setCandidate(updated);
       setStatusFeedback("Status updated.");
-    } catch (statusError) {
-      setStatusFeedback(statusError instanceof Error ? statusError.message : "Unable to update status.");
+    } catch {
+      setStatusError(true);
+      setStatusFeedback("Unable to update status. Please try again.");
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -73,13 +89,15 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
 
     setIsUpdatingStage(true);
     setStageFeedback(null);
+    setStageError(false);
 
     try {
       const updated = await patchRecord(id, { stage: nextStage as (typeof STAGE_OPTIONS)[number] });
       setCandidate(updated);
       setStageFeedback("Stage updated.");
-    } catch (stageError) {
-      setStageFeedback(stageError instanceof Error ? stageError.message : "Unable to update stage.");
+    } catch {
+      setStageError(true);
+      setStageFeedback("Unable to update stage. Please try again.");
     } finally {
       setIsUpdatingStage(false);
     }
@@ -88,8 +106,10 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
   const handleAddNote = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNoteFeedback(null);
+    setNoteError(false);
 
     if (!noteContent.trim()) {
+      setNoteError(true);
       setNoteFeedback("Note content is required.");
       return;
     }
@@ -100,11 +120,12 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
       await addRecordNote(id, { content: noteContent.trim() });
       const [record, recordNotes] = await Promise.all([getRecordById(id), getRecordNotes(id)]);
       setCandidate(record);
-      setNotes(recordNotes);
+      setNotes(recordNotes ?? []);
       setNoteContent("");
       setNoteFeedback("Note added.");
-    } catch (noteError) {
-      setNoteFeedback(noteError instanceof Error ? noteError.message : "Unable to add note.");
+    } catch {
+      setNoteError(true);
+      setNoteFeedback("Unable to add note. Please try again.");
     } finally {
       setIsAddingNote(false);
     }
@@ -113,15 +134,17 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
   const handleDeleteNote = async (noteId: string) => {
     setDeletingNoteId(noteId);
     setNoteFeedback(null);
+    setNoteError(false);
 
     try {
       await deleteRecordNote(id, noteId);
       const [record, recordNotes] = await Promise.all([getRecordById(id), getRecordNotes(id)]);
       setCandidate(record);
-      setNotes(recordNotes);
+      setNotes(recordNotes ?? []);
       setNoteFeedback("Note deleted.");
-    } catch (deleteError) {
-      setNoteFeedback(deleteError instanceof Error ? deleteError.message : "Unable to delete note.");
+    } catch {
+      setNoteError(true);
+      setNoteFeedback("Unable to delete note. Please try again.");
     } finally {
       setDeletingNoteId(null);
     }
@@ -139,15 +162,31 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
         </Link>
       </header>
 
-      {error ? <p className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
+      {error ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <p>{error}</p>
+          {onRetryLoad ? (
+            <button
+              type="button"
+              onClick={onRetryLoad}
+              className="rounded bg-rose-700 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-800"
+            >
+              Retry
+            </button>
+          ) : null}
+          <Link href="/" className="text-xs font-semibold underline underline-offset-2">
+            Back to candidate list
+          </Link>
+        </div>
+      ) : null}
 
       {!error && candidate ? (
         <>
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-slate-900">{candidate.full_name}</h2>
-                <p className="mt-1 text-sm text-slate-500">{candidate.email}</p>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-900">{candidate.full_name ?? "Unknown candidate"}</h2>
+                <p className="mt-1 text-sm text-slate-500">{candidate.email ?? "—"}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <StatusPill status={candidate.status} />
@@ -158,11 +197,11 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
             <dl className="mt-6 grid gap-5 sm:grid-cols-2">
               <div>
                 <dt className="text-xs uppercase tracking-wide text-slate-500">Phone</dt>
-                <dd className="text-sm text-slate-800">{candidate.phone}</dd>
+                <dd className="text-sm text-slate-800">{candidate.phone ?? "—"}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-slate-500">Position</dt>
-                <dd className="text-sm text-slate-800">{candidate.position}</dd>
+                <dd className="text-sm text-slate-800">{candidate.position ?? "—"}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-slate-500">LinkedIn</dt>
@@ -198,7 +237,9 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-slate-500">{isUpdatingStatus ? "Saving status..." : statusFeedback ?? "Select a status to update immediately."}</p>
+              <p className={`mt-2 text-xs ${statusError ? "text-rose-700" : "text-slate-500"}`}>
+                {isUpdatingStatus ? "Saving status..." : statusFeedback ?? "Select a status to update immediately."}
+              </p>
             </div>
 
             <div>
@@ -215,7 +256,9 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-slate-500">{isUpdatingStage ? "Saving stage..." : stageFeedback ?? "Select a stage to update immediately."}</p>
+              <p className={`mt-2 text-xs ${stageError ? "text-rose-700" : "text-slate-500"}`}>
+                {isUpdatingStage ? "Saving stage..." : stageFeedback ?? "Select a stage to update immediately."}
+              </p>
             </div>
           </section>
 
@@ -241,7 +284,11 @@ export function CandidateDetailPage({ id, initialCandidate, initialNotes, initia
               </div>
             </form>
 
-            {noteFeedback ? <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">{noteFeedback}</p> : null}
+            {noteFeedback ? (
+              <p className={`mt-3 rounded-lg px-3 py-2 text-sm ${noteError ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-700"}`}>
+                {noteFeedback}
+              </p>
+            ) : null}
 
             <ul className="mt-4 space-y-3">
               {notes.map((note) => (
