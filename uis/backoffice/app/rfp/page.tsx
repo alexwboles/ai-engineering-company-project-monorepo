@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ApiError, apiRequest } from "@/lib/api-client";
 
-type TicketStatus = "analyzing" | "waiting_for_approval" | "done" | "discarded" | "failed";
+type TicketStatus = "analyzing" | "waiting_for_approval" | "done" | "discarded" | "failed" | "drafting" | "under_evaluation" | "needs_human_review" | "ready_for_approval";
 
 type RfpTicket = {
   id: string;
@@ -32,6 +32,21 @@ type RfpTicket = {
     }>;
   } | null;
   error?: string | null;
+  response?: {
+    approval_status: string;
+    ready_for_part_3: boolean;
+    department_tickets: Array<{
+      department: string;
+      assigned_content: string;
+      iterations: number;
+      needs_human_review: boolean;
+      evaluation: {
+        passed: boolean;
+        iterations: number;
+        results: Record<string, { passed: boolean; feedback?: string | null; failed_rules?: string[] | null }>;
+      };
+    }>;
+  } | null;
 };
 
 const STATUS_STYLES: Record<TicketStatus, string> = {
@@ -40,6 +55,10 @@ const STATUS_STYLES: Record<TicketStatus, string> = {
   done: "bg-emerald-100 text-emerald-800",
   discarded: "bg-slate-200 text-slate-700",
   failed: "bg-rose-100 text-rose-800",
+  drafting: "bg-indigo-100 text-indigo-800",
+  under_evaluation: "bg-orange-100 text-orange-800",
+  needs_human_review: "bg-rose-100 text-rose-800",
+  ready_for_approval: "bg-emerald-100 text-emerald-800",
 };
 
 export default function RfpIntakePage() {
@@ -48,6 +67,7 @@ export default function RfpIntakePage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [generating, setGenerating] = useState<string | null>(null);
 
   const loadTickets = useCallback(async () => {
     try {
@@ -66,7 +86,7 @@ export default function RfpIntakePage() {
   }, [loadTickets]);
 
   useEffect(() => {
-    if (!tickets.some((ticket) => ticket.status === "analyzing" || ticket.status === "waiting_for_approval")) {
+    if (!tickets.some((ticket) => ["analyzing", "waiting_for_approval", "drafting", "under_evaluation"].includes(ticket.status))) {
       return;
     }
     const timer = window.setInterval(() => void loadTickets(), 2000);
@@ -100,6 +120,20 @@ export default function RfpIntakePage() {
       setError(caught instanceof ApiError ? caught.message : "Unable to upload this RFP.");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function generateResponse(ticketId: string) {
+    setGenerating(ticketId);
+    setError("");
+    try {
+      await apiRequest<RfpTicket>(`/rfp/tickets/${ticketId}/generate`, { method: "POST" });
+      setMessage("Department drafts are being generated and evaluated. This ticket will refresh automatically.");
+      await loadTickets();
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Unable to start response generation.");
+    } finally {
+      setGenerating(null);
     }
   }
 
@@ -140,14 +174,14 @@ export default function RfpIntakePage() {
         {loading ? <p className="mt-4 rounded-xl bg-white p-6 text-sm text-slate-600">Loading RFP tickets...</p> : null}
         {!loading && tickets.length === 0 ? <p className="mt-4 rounded-xl bg-white p-6 text-sm text-slate-600">No RFP tickets yet.</p> : null}
         <div className="mt-4 space-y-5">
-          {tickets.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} />)}
+          {tickets.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} onGenerate={generateResponse} generating={generating === ticket.id} />)}
         </div>
       </section>
     </main>
   );
 }
 
-function TicketCard({ ticket }: { ticket: RfpTicket }) {
+function TicketCard({ ticket, onGenerate, generating }: { ticket: RfpTicket; onGenerate: (ticketId: string) => void; generating: boolean }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -167,6 +201,8 @@ function TicketCard({ ticket }: { ticket: RfpTicket }) {
 
       {ticket.status === "discarded" ? <p className="mt-5 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700">Not routed: {ticket.error ?? ticket.classifier?.reason ?? "The document did not meet the RFP criteria."}</p> : null}
       {ticket.status === "failed" ? <p className="mt-5 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-800">Analysis failed: {ticket.error ?? "Please upload the document again."}</p> : null}
+      {ticket.status === "done" && !ticket.response ? <button type="button" onClick={() => onGenerate(ticket.id)} disabled={generating} className="mt-5 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">{generating ? "Starting response generation..." : "Generate pricing proposal draft"}</button> : null}
+      {ticket.response ? <ResponseHandoff response={ticket.response} /> : null}
       {ticket.result ? <div className="mt-5">
         <p className="text-sm font-semibold text-slate-950">Sales routing summary</p>
         <p className="mt-1 text-sm text-slate-700">{ticket.result.summary}</p>
@@ -180,6 +216,30 @@ function TicketCard({ ticket }: { ticket: RfpTicket }) {
       </div> : null}
     </article>
   );
+}
+
+function ResponseHandoff({ response }: { response: NonNullable<RfpTicket["response"]> }) {
+  return <section className="mt-6 border-t border-slate-200 pt-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h4 className="text-lg font-semibold text-slate-950">Pricing proposal handoff</h4>
+        <p className="mt-1 text-sm text-slate-600">Each department draft is shown with its readability, relevance, and HealthCore guideline results.</p>
+      </div>
+      <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${response.ready_for_part_3 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>{response.ready_for_part_3 ? "Ready for Part 3" : "Human review needed"}</span>
+    </div>
+    <div className="mt-4 space-y-4">
+      {response.department_tickets.map((department) => <div key={department.department} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h5 className="font-semibold text-slate-950">{department.department}</h5>
+          <span className={`text-xs font-semibold ${department.evaluation.passed ? "text-emerald-700" : "text-rose-700"}`}>{department.evaluation.passed ? "All evaluators passed" : "Needs human review"} | {department.iterations} iteration(s)</span>
+        </div>
+        <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-white p-4 text-sm leading-6 text-slate-700">{department.assigned_content}</pre>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {Object.entries(department.evaluation.results).map(([name, result]) => <div key={name} className={`rounded-lg px-3 py-2 text-xs ${result.passed ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}><p className="font-semibold">{name}: {result.passed ? "pass" : "fail"}</p>{result.failed_rules?.length ? <p className="mt-1">{result.failed_rules.join(", ")}</p> : null}{result.feedback ? <p className="mt-1">{result.feedback}</p> : null}</div>)}
+        </div>
+      </div>)}
+    </div>
+  </section>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

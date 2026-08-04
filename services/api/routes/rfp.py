@@ -12,10 +12,12 @@ try:
     from services.api.auth_security import get_current_user
     from services.rfp_intake.pipeline import process_rfp_ticket
     from services.rfp_intake.store import RfpTicketStore, default_artifact_dir
+    from services.rfp_response.pipeline import process_rfp_response
 except ModuleNotFoundError:
     from auth_security import get_current_user
     from rfp_intake.pipeline import process_rfp_ticket
     from rfp_intake.store import RfpTicketStore, default_artifact_dir
+    from rfp_response.pipeline import process_rfp_response
 
 
 router = APIRouter(prefix="/rfp", tags=["rfp-intake"])
@@ -70,4 +72,20 @@ def get_rfp_ticket(ticket_id: str, current_user: Any = Depends(get_current_user)
     ticket = ticket_store.get(ticket_id)
     if ticket is None or ticket.owner_user_id != getattr(current_user, "id", None):
         raise HTTPException(status_code=404, detail="RFP ticket not found.")
+    return ticket.model_dump(mode="json")
+
+
+@router.post("/tickets/{ticket_id}/generate", status_code=status.HTTP_202_ACCEPTED)
+def generate_rfp_response(
+    ticket_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: Any = Depends(get_current_user),
+) -> dict[str, Any]:
+    ticket = ticket_store.get(ticket_id)
+    if ticket is None or ticket.owner_user_id != getattr(current_user, "id", None):
+        raise HTTPException(status_code=404, detail="RFP ticket not found.")
+    if ticket.status not in {"done", "needs_human_review", "failed"}:
+        return ticket.model_dump(mode="json")
+
+    background_tasks.add_task(process_rfp_response, ticket.id)
     return ticket.model_dump(mode="json")

@@ -15,6 +15,10 @@ class RfpTicketStatus(StrEnum):
     DONE = "done"
     DISCARDED = "discarded"
     FAILED = "failed"
+    DRAFTING = "drafting"
+    UNDER_EVALUATION = "under_evaluation"
+    NEEDS_HUMAN_REVIEW = "needs_human_review"
+    READY_FOR_APPROVAL = "ready_for_approval"
 
 
 class RfpTicket(BaseModel):
@@ -32,5 +36,6 @@ class RfpTicket(BaseModel):
     readability: dict[str, Any] | None = None
     classifier: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
+    response: dict[str, Any] | None = None
     error: str | None = None
     owner_user_id: int | None = None
