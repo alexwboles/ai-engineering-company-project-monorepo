@@ -1,0 +1,9 @@
+[run]
+branch = true
+
+[report]
+include =
+    auth_security.py
+    routes/auth.py
+omit =
+    tests/*
