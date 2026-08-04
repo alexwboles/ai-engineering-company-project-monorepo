@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,6 +45,7 @@ class InboundOrderResponse(BaseModel):
     quantity: int
     created_at: datetime
     user_uuid: str
+    order_type: Literal["inbound"]
     product: ProductSummary
 
 
@@ -55,4 +57,5 @@ class OutboundOrderResponse(BaseModel):
     quantity: int
     created_at: datetime
     user_uuid: str
+    order_type: Literal["outbound"]
     product: ProductSummary

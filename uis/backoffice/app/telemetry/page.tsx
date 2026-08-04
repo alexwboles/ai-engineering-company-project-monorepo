@@ -25,27 +25,30 @@ export default function TelemetryReportPage() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError("");
-    void apiRequest<TelemetryReport>("/telemetry/report")
-      .then((nextReport) => {
-        if (active) {
-          setReport(nextReport);
-        }
-      })
-      .catch((requestError) => {
-        if (active) {
-          setError(requestError instanceof ApiError ? requestError.message : "Unable to load telemetry report.");
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError("");
+      void apiRequest<TelemetryReport>("/telemetry/report")
+        .then((nextReport) => {
+          if (active) {
+            setReport(nextReport);
+          }
+        })
+        .catch((requestError) => {
+          if (active) {
+            setError(requestError instanceof ApiError ? requestError.message : "Unable to load telemetry report.");
+          }
+        })
+        .finally(() => {
+          if (active) {
+            setLoading(false);
+          }
+        });
+    }, 0);
 
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [reloadToken]);
 

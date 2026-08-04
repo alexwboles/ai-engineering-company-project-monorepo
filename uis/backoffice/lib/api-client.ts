@@ -107,16 +107,17 @@ function buildHeaders(authRequired: boolean, headers?: HeadersInit): Headers {
 export async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
-  options: { authRequired?: boolean } = {}
+  options: { authRequired?: boolean; baseUrl?: string } = {}
 ): Promise<T> {
   const authRequired = options.authRequired ?? true;
+  const baseUrl = options.baseUrl ?? API_BASE_URL;
   const method = (init.method ?? "GET").toUpperCase();
   const route = path.split("?")[0] || path;
   const requestStartedAt = performance.now();
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(`${baseUrl}${path}`, {
       ...init,
       headers: buildHeaders(authRequired, init.headers),
       cache: "no-store",

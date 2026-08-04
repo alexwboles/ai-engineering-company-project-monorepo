@@ -80,7 +80,7 @@ def _product_summary(product: Product) -> ProductSummary:
     return ProductSummary(id=product.id, name=product.name, sku=product.sku)
 
 
-def _order_payload(order: Any, product: Product) -> dict[str, Any]:
+def _order_payload(order: Any, product: Product, order_type: str) -> dict[str, Any]:
     if order.id is None:
         raise HTTPException(status_code=500, detail="Order identifier was not generated.")
     return {
@@ -89,6 +89,7 @@ def _order_payload(order: Any, product: Product) -> dict[str, Any]:
         "quantity": order.quantity,
         "created_at": order.created_at,
         "user_uuid": order.user_uuid,
+        "order_type": order_type,
         "product": _product_summary(product),
     }
 
@@ -159,7 +160,7 @@ def create_inbound_order(
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Unable to register the inbound order.") from None
-    return InboundOrderResponse.model_validate(_order_payload(order, product))
+    return InboundOrderResponse.model_validate(_order_payload(order, product, "inbound"))
 
 
 @router.post("/orders/outbound", response_model=OutboundOrderResponse, status_code=status.HTTP_201_CREATED)
@@ -189,7 +190,7 @@ def create_outbound_order(
     except IntegrityError:
         session.rollback()
         raise HTTPException(status_code=400, detail="Unable to register the outbound order.") from None
-    return OutboundOrderResponse.model_validate(_order_payload(order, product))
+    return OutboundOrderResponse.model_validate(_order_payload(order, product, "outbound"))
 
 
 @router.get("/orders", response_model=list[InboundOrderResponse | OutboundOrderResponse])
@@ -202,9 +203,11 @@ def list_orders(session: Session = Depends(get_db)) -> list[InboundOrderResponse
     ).all()
 
     orders: list[InboundOrderResponse | OutboundOrderResponse] = [
-        InboundOrderResponse.model_validate(_order_payload(order, product)) for order, product in inbound_rows
+        InboundOrderResponse.model_validate(_order_payload(order, product, "inbound"))
+        for order, product in inbound_rows
     ]
     orders.extend(
-        OutboundOrderResponse.model_validate(_order_payload(order, product)) for order, product in outbound_rows
+        OutboundOrderResponse.model_validate(_order_payload(order, product, "outbound"))
+        for order, product in outbound_rows
     )
     return sorted(orders, key=lambda order: order.created_at)

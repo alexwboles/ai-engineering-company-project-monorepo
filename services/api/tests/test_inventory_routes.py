@@ -71,6 +71,7 @@ def test_inventory_flow_computes_stock_and_persists_authenticated_user(inventory
 
     orders_response = inventory_client.get("/inventory/orders")
     assert orders_response.status_code == 200
+    assert {order["order_type"] for order in orders_response.json()} == {"inbound", "outbound"}
     assert len(orders_response.json()) == 2
     assert {order["product"]["sku"] for order in orders_response.json()} == {"HC-GLOVE-001"}
 
