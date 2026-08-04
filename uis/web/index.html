@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HealthCore Incident Analysis</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">HealthCore Backoffice</p>
+        <h1>Incident Analysis</h1>
+        <p class="subtitle">Upload incidents CSV, review summary metrics, and export validated results.</p>
+      </div>
+      <nav class="menu">
+        <a href="#" aria-current="page">Incident Analysis</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="card upload-card">
+        <h2>Upload CSV</h2>
+        <label id="drop-zone" class="drop-zone" for="file-input">
+          <input id="file-input" type="file" accept=".csv" />
+          <span>Drag & drop a CSV file here or click to select</span>
+        </label>
+        <button id="analyze-btn" class="btn">Analyze File</button>
+        <p id="status-message" class="status"></p>
+      </section>
+
+      <section id="results-section" class="card hidden" aria-live="polite">
+        <div class="results-head">
+          <h2>Summary</h2>
+          <button id="export-btn" class="btn secondary">Download results.csv</button>
+        </div>
+
+        <div id="summary-grid" class="summary-grid"></div>
+
+        <div class="split-grid">
+          <article>
+            <h3>Category Breakdown</h3>
+            <ul id="category-list" class="list"></ul>
+          </article>
+          <article>
+            <h3>Status Breakdown</h3>
+            <ul id="status-list" class="list"></ul>
+          </article>
+        </div>
+
+        <article>
+          <h3>Invalid Records by Type</h3>
+          <ul id="invalid-list" class="list"></ul>
+        </article>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

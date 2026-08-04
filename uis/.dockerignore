@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+.next
+**/.next
+.env
+*.log
+**/*.log
+.git
+.gitignore
