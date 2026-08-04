@@ -7,6 +7,7 @@ from .telemetry import router as telemetry_router
 from .telemetry_report import router as telemetry_report_router
 from .inventory import router as inventory_router
 from .tasks import router as tasks_router
+from .rfp import router as rfp_router
 
 __all__ = [
     "suppliers_router",
@@ -18,4 +19,5 @@ __all__ = [
     "telemetry_report_router",
     "inventory_router",
     "tasks_router",
+    "rfp_router",
 ]

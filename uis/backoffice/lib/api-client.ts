@@ -81,10 +81,11 @@ export function toUserFacingApiMessage(status: number, detail?: unknown, fallbac
   return fallback ?? "Unable to complete the request. Please try again.";
 }
 
-function buildHeaders(authRequired: boolean, headers?: HeadersInit): Headers {
+function buildHeaders(authRequired: boolean, headers?: HeadersInit, body?: BodyInit | null): Headers {
   const merged = new Headers(headers ?? {});
 
-  if (!merged.has("Content-Type")) {
+  const isMultipart = typeof FormData !== "undefined" && body instanceof FormData;
+  if (!merged.has("Content-Type") && !isMultipart) {
     merged.set("Content-Type", "application/json");
   }
 
@@ -119,7 +120,7 @@ export async function apiRequest<T>(
   try {
     response = await fetch(`${baseUrl}${path}`, {
       ...init,
-      headers: buildHeaders(authRequired, init.headers),
+      headers: buildHeaders(authRequired, init.headers, init.body),
       cache: "no-store",
     });
   } catch {

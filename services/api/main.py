@@ -24,6 +24,7 @@ try:
         telemetry_router,
         telemetry_report_router,
         tasks_router,
+        rfp_router,
         users_router,
     )
 except ModuleNotFoundError:
@@ -38,6 +39,7 @@ except ModuleNotFoundError:
         telemetry_report_router,
         telemetry_router,
         tasks_router,
+        rfp_router,
         users_router,
     )
 
@@ -84,6 +86,7 @@ app.include_router(telemetry_report_router)
 app.include_router(inventory_router)
 app.include_router(reporting_router)
 app.include_router(tasks_router)
+app.include_router(rfp_router)
 
 
 @app.on_event("startup")

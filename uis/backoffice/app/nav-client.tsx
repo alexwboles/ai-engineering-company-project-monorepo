@@ -47,6 +47,9 @@ export function NavClient() {
       <Link href="/inventory/products" className="rounded-full bg-emerald-100 px-3 py-1 font-medium text-emerald-800 hover:bg-emerald-200">
         Inventory
       </Link>
+      <Link href="/rfp" className="rounded-full bg-violet-100 px-3 py-1 font-medium text-violet-800 hover:bg-violet-200">
+        RFP Intake
+      </Link>
       <Link href="/account/profile" className="rounded-full bg-indigo-100 px-3 py-1 font-medium text-indigo-800 hover:bg-indigo-200">
         Profile
       </Link>
