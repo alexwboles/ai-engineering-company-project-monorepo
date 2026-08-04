@@ -16,9 +16,11 @@ from starlette.requests import Request
 
 try:
     from services.api.auth_security import get_current_user
+    from services.api.database import init_inventory_db
     from services.api.routes import (
         auth_router,
         incidents_router,
+        inventory_router,
         profiles_router,
         suppliers_router,
         telemetry_router,
@@ -27,9 +29,11 @@ try:
     )
 except ModuleNotFoundError:
     from auth_security import get_current_user
+    from database import init_inventory_db
     from routes import (
         auth_router,
         incidents_router,
+        inventory_router,
         profiles_router,
         suppliers_router,
         telemetry_report_router,
@@ -79,6 +83,12 @@ app.include_router(auth_router)
 app.include_router(incidents_router)
 app.include_router(telemetry_router)
 app.include_router(telemetry_report_router)
+app.include_router(inventory_router)
+
+
+@app.on_event("startup")
+def initialize_inventory_schema() -> None:
+    init_inventory_db()
 
 
 @app.exception_handler(RequestValidationError)

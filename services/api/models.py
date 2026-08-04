@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlmodel import Field as SQLModelField
+from sqlmodel import SQLModel
 
 PRODUCT_CATEGORIES: tuple[str, ...] = (
     "medical_equipment",
@@ -89,3 +91,37 @@ class SupplierRateUpdate(BaseModel):
 
 class SupplierStatusUpdate(BaseModel):
     status: SupplierStatus
+
+
+class Product(SQLModel, table=True):
+    """Supabase product identity; stock is derived from order history."""
+
+    __tablename__ = "products"
+
+    id: int | None = SQLModelField(default=None, primary_key=True)
+    name: str = SQLModelField(index=True, max_length=200)
+    sku: str = SQLModelField(index=True, unique=True, max_length=64)
+
+
+class InboundOrder(SQLModel, table=True):
+    """Immutable order fact that adds quantity to a product's derived stock."""
+
+    __tablename__ = "inbound_orders"
+
+    id: int | None = SQLModelField(default=None, primary_key=True)
+    product_id: int = SQLModelField(foreign_key="products.id", index=True)
+    quantity: int = SQLModelField(gt=0)
+    created_at: datetime = SQLModelField(default_factory=lambda: datetime.now(timezone.utc))
+    user_uuid: str = SQLModelField(index=True, max_length=64)
+
+
+class OutboundOrder(SQLModel, table=True):
+    """Immutable order fact that subtracts quantity from derived stock."""
+
+    __tablename__ = "outbound_orders"
+
+    id: int | None = SQLModelField(default=None, primary_key=True)
+    product_id: int = SQLModelField(foreign_key="products.id", index=True)
+    quantity: int = SQLModelField(gt=0)
+    created_at: datetime = SQLModelField(default_factory=lambda: datetime.now(timezone.utc))
+    user_uuid: str = SQLModelField(index=True, max_length=64)
