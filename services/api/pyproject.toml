@@ -23,6 +23,7 @@ dependencies = [
   "flower>=2.0.1",
   "markitdown>=0.1.7",
   "py-readability-metrics>=1.4.5",
+  "langgraph>=1.2.10",
 ]
 
 [project.scripts]

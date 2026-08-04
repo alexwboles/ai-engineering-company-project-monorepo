@@ -1,0 +1,43 @@
+{
+  "question": "What laws protect HealthCore patient data?",
+  "retrieved_context": [
+    {
+      "id": "healthcore-compliance",
+      "source": "CONTEXT_HEALTHCORE.md",
+      "text": "HealthCore protects patient data under HIPAA in the United States and UK GDPR in the United Kingdom. Systems must control how patient data is stored, accessed, and shared.",
+      "score": 3.0
+    },
+    {
+      "id": "healthcore-access",
+      "source": "CONTEXT.md",
+      "text": "Patient Experience and Access manages booking, appointment reminders, follow-up, and the patient journey. HealthCore currently reports a 22% no-show rate across the network.",
+      "score": 2.0
+    },
+    {
+      "id": "healthcore-billing",
+      "source": "CONTEXT.md",
+      "text": "Revenue Cycle and Billing manages commercial insurance, Medicare, Medicaid, private pay, and NHS billing. HealthCore reports a 14% claim denial rate.",
+      "score": 1.0
+    }
+  ],
+  "answer": "According to the HealthCore knowledge base: HealthCore protects patient data under HIPAA in the United States and UK GDPR in the United Kingdom. Systems must control how patient data is stored, accessed, and shared. Patient Experience and Access manages booking, appointment reminders, follow-up, and the patient journey. HealthCore currently reports a 22% no-show rate across the network. Revenue Cycle and Billing manages commercial insurance, Medicare, Medicaid, private pay, and NHS billing. HealthCore reports a 14% claim denial rate.",
+  "error": null,
+  "trace_id": "pr-evidence-trace",
+  "trace_steps": [
+    {
+      "node": "receive_question",
+      "order": 1,
+      "output_summary": "question accepted"
+    },
+    {
+      "node": "retrieve",
+      "order": 2,
+      "output_summary": "retrieved 3 context chunks"
+    },
+    {
+      "node": "query",
+      "order": 3,
+      "output_summary": "generated answer from retrieved context"
+    }
+  ]
+}

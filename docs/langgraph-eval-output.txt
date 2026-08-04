@@ -1,0 +1,6 @@
+Command:
+uv run --project services/api pytest -q tests/pipelines/test_agent_evals.py
+
+Output:
+....                                                                     [100%]
+4 passed in 0.77s
