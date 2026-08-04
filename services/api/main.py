@@ -47,6 +47,11 @@ except ModuleNotFoundError:
     from telemetry_storage import create_telemetry_store
 
 try:
+    from services.reporting.routes import router as reporting_router
+except ModuleNotFoundError:
+    from reporting.routes import router as reporting_router
+
+try:
     # Works when imported as services.api.main from repository root.
     from services.api.incident_analysis import (
         analyze_incident_rows,
@@ -84,6 +89,7 @@ app.include_router(incidents_router)
 app.include_router(telemetry_router)
 app.include_router(telemetry_report_router)
 app.include_router(inventory_router)
+app.include_router(reporting_router)
 
 
 @app.on_event("startup")

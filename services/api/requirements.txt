@@ -10,3 +10,4 @@ httpx>=0.28.1
 pandas>=2.2.3
 psycopg2-binary>=2.9.12
 sqlmodel>=0.0.39
+prefect>=3

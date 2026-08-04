@@ -311,3 +311,7 @@ The reporting module will be `services/reporting/`, with its own router and resp
 ## Reference Context
 
 This design follows the HealthCore business-performance context for the data-pipelines milestone and the repository's approved telemetry envelope/storage design. The authoritative business context is the syllabus file `CONTEXT-healthcore.md` under `06-telemetry-data-pipelines/data-pipelines`; the repository-specific context files remain the domain vocabulary reference for HealthCore entities and compliance constraints.
+
+## Implementation Command
+
+From the repository root, run `uv run --project services/api python data/pipelines/pipeline.py`. If the `services/api` virtual environment is activated, `python data/pipelines/pipeline.py` runs the same flow. The scheduled deployment targets the previous complete UTC calendar month on the first working day; `--month-start YYYY-MM-01` is available for a manual backfill.
