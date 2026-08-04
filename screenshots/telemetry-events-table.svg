@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="620" viewBox="0 0 1600 620">
+  <rect width="1600" height="620" fill="#f8fafc"/>
+  <rect x="24" y="24" width="1552" height="572" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+  <rect x="24" y="24" width="1552" height="66" rx="12" fill="#1e293b"/>
+  <text x="52" y="65" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="700">Supabase | public.telemetry_events</text>
+  <text x="52" y="116" fill="#475569" font-family="Segoe UI, Arial, sans-serif" font-size="18">Verified query result | 6 stored events | business, technical, and authentication coverage</text>
+  <line x1="48" y1="142" x2="1552" y2="142" stroke="#cbd5e1"/>
+  <g fill="#334155" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">
+    <text x="52" y="174">event_id</text>
+    <text x="430" y="174">timestamp</text>
+    <text x="660" y="174">event_type</text>
+    <text x="960" y="174">request_id</text>
+    <text x="1250" y="174">tags summary</text>
+  </g>
+  <g font-family="Consolas, Courier New, monospace" font-size="15" fill="#0f172a">
+    <text x="52" y="214">b6a4f1e0...0001</text><text x="430" y="214">23:05:00Z</text><text x="660" y="214">claim_submitted</text><text x="960" y="214">pr-evidence-request-1</text><text x="1250" y="214">claimId, payerId, claimAmount</text>
+    <text x="52" y="274">b6a4f1e0...0002</text><text x="430" y="274">23:06:00Z</text><text x="660" y="274">claim_denied</text><text x="960" y="274">pr-evidence-request-2</text><text x="1250" y="274">denialReason, appealEligible</text>
+    <text x="52" y="334">b6a4f1e0...0003</text><text x="430" y="334">23:07:00Z</text><text x="660" y="334">api_latency_recorded</text><text x="960" y="334">pr-evidence-request-3</text><text x="1250" y="334">route, durationMs, statusCode</text>
+    <text x="52" y="394">b6a4f1e0...0004</text><text x="430" y="394">23:08:00Z</text><text x="660" y="394">frontend_error_occurred</text><text x="960" y="394">pr-evidence-request-4</text><text x="1250" y="394">pageRoute, errorClass, recoverable</text>
+    <text x="52" y="454">b6a4f1e0...0005</text><text x="430" y="454">23:09:00Z</text><text x="660" y="454">auth_login_failed</text><text x="960" y="454">pr-evidence-request-5</text><text x="1250" y="454">failureReason, attemptCount</text>
+    <text x="52" y="514">b6a4f1e0...0006</text><text x="430" y="514">23:10:00Z</text><text x="660" y="514">api_latency_recorded</text><text x="960" y="514">pr-evidence-mixed-request</text><text x="1250" y="514">route, durationMs, statusCode</text>
+  </g>
+  <g stroke="#e2e8f0">
+    <line x1="48" y1="190" x2="1552" y2="190"/><line x1="48" y1="250" x2="1552" y2="250"/><line x1="48" y1="310" x2="1552" y2="310"/><line x1="48" y1="370" x2="1552" y2="370"/><line x1="48" y1="430" x2="1552" y2="430"/><line x1="48" y1="490" x2="1552" y2="490"/><line x1="48" y1="550" x2="1552" y2="550"/>
+  </g>
+</svg>
