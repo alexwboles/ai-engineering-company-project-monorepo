@@ -4,24 +4,32 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from pydantic import BaseModel, Field
 
 try:
     from services.api.auth_security import get_current_user
     from services.rfp_intake.pipeline import process_rfp_ticket
     from services.rfp_intake.store import RfpTicketStore, default_artifact_dir
     from services.rfp_response.pipeline import process_rfp_response
+    from services.rfp_approval import ApprovalWorkflowError, get_approval_state, read_final_document, resume, start_approval_run
 except ModuleNotFoundError:
     from auth_security import get_current_user
     from rfp_intake.pipeline import process_rfp_ticket
     from rfp_intake.store import RfpTicketStore, default_artifact_dir
     from rfp_response.pipeline import process_rfp_response
+    from rfp_approval import ApprovalWorkflowError, get_approval_state, read_final_document, resume, start_approval_run
 
 
 router = APIRouter(prefix="/rfp", tags=["rfp-intake"])
 ticket_store = RfpTicketStore()
+
+
+class ApprovalDecisionRequest(BaseModel):
+    decision: Literal["approve", "reject", "request_changes"]
+    comment: str | None = Field(default=None, max_length=2000)
 
 
 @router.post("/tickets", status_code=status.HTTP_202_ACCEPTED)
@@ -89,3 +97,63 @@ def generate_rfp_response(
 
     background_tasks.add_task(process_rfp_response, ticket.id)
     return ticket.model_dump(mode="json")
+
+
+@router.post("/tickets/{ticket_id}/approvals/start", status_code=status.HTTP_202_ACCEPTED)
+def start_rfp_approvals(ticket_id: str, current_user: Any = Depends(get_current_user)) -> dict[str, Any]:
+    ticket = ticket_store.get(ticket_id)
+    if ticket is None or ticket.owner_user_id != getattr(current_user, "id", None):
+        raise HTTPException(status_code=404, detail="RFP ticket not found.")
+    try:
+        return start_approval_run(ticket_id, store=ticket_store)
+    except ApprovalWorkflowError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+
+@router.get("/tickets/{ticket_id}/approvals")
+def get_rfp_approvals(ticket_id: str, current_user: Any = Depends(get_current_user)) -> dict[str, Any]:
+    ticket = ticket_store.get(ticket_id)
+    if ticket is None or ticket.owner_user_id != getattr(current_user, "id", None):
+        raise HTTPException(status_code=404, detail="RFP ticket not found.")
+    approval = get_approval_state(ticket_id, store=ticket_store)
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Approval run has not started.")
+    return approval
+
+
+@router.post("/tickets/{ticket_id}/approvals/{department}")
+def resume_rfp_approval(
+    ticket_id: str,
+    department: str,
+    payload: ApprovalDecisionRequest,
+    current_user: Any = Depends(get_current_user),
+) -> dict[str, Any]:
+    ticket = ticket_store.get(ticket_id)
+    if ticket is None or ticket.owner_user_id != getattr(current_user, "id", None):
+        raise HTTPException(status_code=404, detail="RFP ticket not found.")
+    thread_id = (ticket.approval or {}).get("thread_id")
+    if not thread_id:
+        raise HTTPException(status_code=409, detail="Start the approval run before submitting a decision.")
+    try:
+        return resume(
+            str(thread_id),
+            department,
+            payload.decision,
+            actor=str(getattr(current_user, "email", getattr(current_user, "id", "authenticated approver"))),
+            comment=payload.comment,
+            store=ticket_store,
+        )
+    except ApprovalWorkflowError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+
+@router.get("/tickets/{ticket_id}/final-document")
+def get_final_rfp_document(ticket_id: str, current_user: Any = Depends(get_current_user)) -> dict[str, str]:
+    ticket = ticket_store.get(ticket_id)
+    if ticket is None or ticket.owner_user_id != getattr(current_user, "id", None):
+        raise HTTPException(status_code=404, detail="RFP ticket not found.")
+    document = read_final_document(ticket_id, store=ticket_store)
+    if document is None:
+        raise HTTPException(status_code=404, detail="The final proposal is not available yet.")
+    filename, content = document
+    return {"filename": filename, "content": content}

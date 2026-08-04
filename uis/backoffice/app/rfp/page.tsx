@@ -3,7 +3,27 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ApiError, apiRequest } from "@/lib/api-client";
 
-type TicketStatus = "analyzing" | "waiting_for_approval" | "done" | "discarded" | "failed" | "drafting" | "under_evaluation" | "needs_human_review" | "ready_for_approval";
+type TicketStatus = "analyzing" | "waiting_for_approval" | "done" | "discarded" | "failed" | "drafting" | "under_evaluation" | "needs_human_review" | "ready_for_approval" | "awaiting_approval" | "partially_approved" | "needs_revision" | "arbitrating" | "producing";
+
+type ApprovalState = {
+  thread_id: string;
+  ticket_id: string;
+  status: string;
+  branches: Record<string, {
+    department: string;
+    approver_role: string;
+    status: string;
+    draft: string;
+    evaluation: { passed?: boolean; iterations?: number; results?: Record<string, { passed: boolean; feedback?: string | null; failed_rules?: string[] | null }> };
+    iterations: number;
+    revision_attempts: number;
+    approval?: { actor?: string; comment?: string | null; at?: string } | null;
+    feedback?: string | null;
+  }>;
+  arbitration?: { status?: string; conflicts?: Array<{ conflict_id?: string; departments?: string[]; resolution?: string }> } | null;
+  final_document?: { filename?: string; generated_at?: string } | null;
+  trace?: Array<{ node: string; agent: string; ts: string }>;
+};
 
 type RfpTicket = {
   id: string;
@@ -47,6 +67,8 @@ type RfpTicket = {
       };
     }>;
   } | null;
+  approval?: ApprovalState | null;
+  final_document?: { filename?: string; generated_at?: string } | null;
 };
 
 const STATUS_STYLES: Record<TicketStatus, string> = {
@@ -59,6 +81,11 @@ const STATUS_STYLES: Record<TicketStatus, string> = {
   under_evaluation: "bg-orange-100 text-orange-800",
   needs_human_review: "bg-rose-100 text-rose-800",
   ready_for_approval: "bg-emerald-100 text-emerald-800",
+  awaiting_approval: "bg-amber-100 text-amber-800",
+  partially_approved: "bg-cyan-100 text-cyan-800",
+  needs_revision: "bg-rose-100 text-rose-800",
+  arbitrating: "bg-orange-100 text-orange-800",
+  producing: "bg-indigo-100 text-indigo-800",
 };
 
 export default function RfpIntakePage() {
@@ -68,6 +95,10 @@ export default function RfpIntakePage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [generating, setGenerating] = useState<string | null>(null);
+  const [startingApproval, setStartingApproval] = useState<string | null>(null);
+  const [approvalAction, setApprovalAction] = useState<string | null>(null);
+  const [approvalComments, setApprovalComments] = useState<Record<string, string>>({});
+  const [finalDocument, setFinalDocument] = useState<{ ticketId: string; filename: string; content: string } | null>(null);
 
   const loadTickets = useCallback(async () => {
     try {
@@ -86,7 +117,7 @@ export default function RfpIntakePage() {
   }, [loadTickets]);
 
   useEffect(() => {
-    if (!tickets.some((ticket) => ["analyzing", "waiting_for_approval", "drafting", "under_evaluation"].includes(ticket.status))) {
+    if (!tickets.some((ticket) => ["analyzing", "waiting_for_approval", "drafting", "under_evaluation", "awaiting_approval", "partially_approved", "needs_revision", "arbitrating", "producing"].includes(ticket.status))) {
       return;
     }
     const timer = window.setInterval(() => void loadTickets(), 2000);
@@ -137,6 +168,51 @@ export default function RfpIntakePage() {
     }
   }
 
+  async function startApprovals(ticketId: string) {
+    setStartingApproval(ticketId);
+    setError("");
+    try {
+      await apiRequest<ApprovalState>(`/rfp/tickets/${ticketId}/approvals/start`, { method: "POST" });
+      setMessage("Department approval gates are open. Each lead can decide independently.");
+      await loadTickets();
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Unable to start department approvals.");
+    } finally {
+      setStartingApproval(null);
+    }
+  }
+
+  async function submitApproval(ticketId: string, department: string, decision: "approve" | "reject" | "request_changes") {
+    const comment = approvalComments[`${ticketId}:${department}`]?.trim() || undefined;
+    if (decision !== "approve" && !comment) {
+      setError("Add a comment explaining the requested change before rejecting a section.");
+      return;
+    }
+    setApprovalAction(`${ticketId}:${department}`);
+    setError("");
+    try {
+      await apiRequest<ApprovalState>(`/rfp/tickets/${ticketId}/approvals/${encodeURIComponent(department)}`, {
+        method: "POST",
+        body: JSON.stringify({ decision, comment }),
+      });
+      setMessage(`${department} approval updated to ${decision.replaceAll("_", " ")}.`);
+      await loadTickets();
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Unable to record this approval decision.");
+    } finally {
+      setApprovalAction(null);
+    }
+  }
+
+  async function loadFinalDocument(ticketId: string) {
+    try {
+      const document = await apiRequest<{ filename: string; content: string }>(`/rfp/tickets/${ticketId}/final-document`);
+      setFinalDocument({ ticketId, ...document });
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "Unable to load the final proposal.");
+    }
+  }
+
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
       <header className="rounded-3xl border border-violet-200 bg-white/90 p-6 shadow-sm sm:p-8">
@@ -174,14 +250,44 @@ export default function RfpIntakePage() {
         {loading ? <p className="mt-4 rounded-xl bg-white p-6 text-sm text-slate-600">Loading RFP tickets...</p> : null}
         {!loading && tickets.length === 0 ? <p className="mt-4 rounded-xl bg-white p-6 text-sm text-slate-600">No RFP tickets yet.</p> : null}
         <div className="mt-4 space-y-5">
-          {tickets.map((ticket) => <TicketCard key={ticket.id} ticket={ticket} onGenerate={generateResponse} generating={generating === ticket.id} />)}
+          {tickets.map((ticket) => <TicketCard
+            key={ticket.id}
+            ticket={ticket}
+            onGenerate={generateResponse}
+            generating={generating === ticket.id}
+            onStartApprovals={startApprovals}
+            startingApproval={startingApproval === ticket.id}
+            onSubmitApproval={submitApproval}
+            approvalAction={approvalAction}
+            approvalComments={approvalComments}
+            setApprovalComment={(key, value) => setApprovalComments((current) => ({ ...current, [key]: value }))}
+            onLoadFinalDocument={loadFinalDocument}
+          />)}
         </div>
       </section>
+      {finalDocument ? <section className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-lg font-semibold text-emerald-950">Final proposal: {finalDocument.filename}</h2><p className="mt-1 text-sm text-emerald-800">Generated after every HealthCore department approved its section.</p></div>
+          <button type="button" onClick={() => setFinalDocument(null)} className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-semibold text-emerald-800">Close</button>
+        </div>
+        <pre className="mt-4 max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-xl bg-white p-4 text-sm leading-6 text-slate-700">{finalDocument.content}</pre>
+      </section> : null}
     </main>
   );
 }
 
-function TicketCard({ ticket, onGenerate, generating }: { ticket: RfpTicket; onGenerate: (ticketId: string) => void; generating: boolean }) {
+function TicketCard({ ticket, onGenerate, generating, onStartApprovals, startingApproval, onSubmitApproval, approvalAction, approvalComments, setApprovalComment, onLoadFinalDocument }: {
+  ticket: RfpTicket;
+  onGenerate: (ticketId: string) => void;
+  generating: boolean;
+  onStartApprovals: (ticketId: string) => void;
+  startingApproval: boolean;
+  onSubmitApproval: (ticketId: string, department: string, decision: "approve" | "reject" | "request_changes") => void;
+  approvalAction: string | null;
+  approvalComments: Record<string, string>;
+  setApprovalComment: (key: string, value: string) => void;
+  onLoadFinalDocument: (ticketId: string) => void;
+}) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -202,7 +308,17 @@ function TicketCard({ ticket, onGenerate, generating }: { ticket: RfpTicket; onG
       {ticket.status === "discarded" ? <p className="mt-5 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700">Not routed: {ticket.error ?? ticket.classifier?.reason ?? "The document did not meet the RFP criteria."}</p> : null}
       {ticket.status === "failed" ? <p className="mt-5 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-800">Analysis failed: {ticket.error ?? "Please upload the document again."}</p> : null}
       {ticket.status === "done" && !ticket.response ? <button type="button" onClick={() => onGenerate(ticket.id)} disabled={generating} className="mt-5 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">{generating ? "Starting response generation..." : "Generate pricing proposal draft"}</button> : null}
-      {ticket.response ? <ResponseHandoff response={ticket.response} /> : null}
+      {ticket.response ? <ResponseHandoff
+        ticket={ticket}
+        response={ticket.response}
+        onStartApprovals={onStartApprovals}
+        startingApproval={startingApproval}
+        onSubmitApproval={onSubmitApproval}
+        approvalAction={approvalAction}
+        approvalComments={approvalComments}
+        setApprovalComment={setApprovalComment}
+        onLoadFinalDocument={onLoadFinalDocument}
+      /> : null}
       {ticket.result ? <div className="mt-5">
         <p className="text-sm font-semibold text-slate-950">Sales routing summary</p>
         <p className="mt-1 text-sm text-slate-700">{ticket.result.summary}</p>
@@ -218,26 +334,52 @@ function TicketCard({ ticket, onGenerate, generating }: { ticket: RfpTicket; onG
   );
 }
 
-function ResponseHandoff({ response }: { response: NonNullable<RfpTicket["response"]> }) {
+function ResponseHandoff({ ticket, response, onStartApprovals, startingApproval, onSubmitApproval, approvalAction, approvalComments, setApprovalComment, onLoadFinalDocument }: {
+  ticket: RfpTicket;
+  response: NonNullable<RfpTicket["response"]>;
+  onStartApprovals: (ticketId: string) => void;
+  startingApproval: boolean;
+  onSubmitApproval: (ticketId: string, department: string, decision: "approve" | "reject" | "request_changes") => void;
+  approvalAction: string | null;
+  approvalComments: Record<string, string>;
+  setApprovalComment: (key: string, value: string) => void;
+  onLoadFinalDocument: (ticketId: string) => void;
+}) {
   return <section className="mt-6 border-t border-slate-200 pt-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h4 className="text-lg font-semibold text-slate-950">Pricing proposal handoff</h4>
         <p className="mt-1 text-sm text-slate-600">Each department draft is shown with its readability, relevance, and HealthCore guideline results.</p>
       </div>
-      <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${response.ready_for_part_3 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>{response.ready_for_part_3 ? "Ready for Part 3" : "Human review needed"}</span>
+      <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${response.ready_for_part_3 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>{response.ready_for_part_3 ? "Ready for human approval" : "Human review needed"}</span>
     </div>
+    {!ticket.approval && response.ready_for_part_3 ? <button type="button" onClick={() => onStartApprovals(ticket.id)} disabled={startingApproval} className="mt-4 rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60">{startingApproval ? "Opening approval gates..." : "Start human approvals"}</button> : null}
+    {ticket.final_document ? <button type="button" onClick={() => onLoadFinalDocument(ticket.id)} className="mt-4 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">View final approved proposal</button> : null}
     <div className="mt-4 space-y-4">
-      {response.department_tickets.map((department) => <div key={department.department} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h5 className="font-semibold text-slate-950">{department.department}</h5>
-          <span className={`text-xs font-semibold ${department.evaluation.passed ? "text-emerald-700" : "text-rose-700"}`}>{department.evaluation.passed ? "All evaluators passed" : "Needs human review"} | {department.iterations} iteration(s)</span>
-        </div>
-        <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-white p-4 text-sm leading-6 text-slate-700">{department.assigned_content}</pre>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          {Object.entries(department.evaluation.results).map(([name, result]) => <div key={name} className={`rounded-lg px-3 py-2 text-xs ${result.passed ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}><p className="font-semibold">{name}: {result.passed ? "pass" : "fail"}</p>{result.failed_rules?.length ? <p className="mt-1">{result.failed_rules.join(", ")}</p> : null}{result.feedback ? <p className="mt-1">{result.feedback}</p> : null}</div>)}
-        </div>
-      </div>)}
+      {response.department_tickets.map((department) => {
+        const branch = ticket.approval?.branches[department.department];
+        const actionKey = `${ticket.id}:${department.department}`;
+        return <div key={department.department} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h5 className="font-semibold text-slate-950">{department.department}</h5>
+            <span className={`text-xs font-semibold ${branch?.status === "approved" || (!branch && department.evaluation.passed) ? "text-emerald-700" : "text-rose-700"}`}>{branch?.status?.replaceAll("_", " ") ?? (department.evaluation.passed ? "All evaluators passed" : "Needs human review")} | {department.iterations} iteration(s)</span>
+          </div>
+          <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-white p-4 text-sm leading-6 text-slate-700">{department.assigned_content}</pre>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {Object.entries(department.evaluation.results).map(([name, result]) => <div key={name} className={`rounded-lg px-3 py-2 text-xs ${result.passed ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}><p className="font-semibold">{name}: {result.passed ? "pass" : "fail"}</p>{result.failed_rules?.length ? <p className="mt-1">{result.failed_rules.join(", ")}</p> : null}{result.feedback ? <p className="mt-1">{result.feedback}</p> : null}</div>)}
+          </div>
+          {branch?.status === "awaiting_approval" || branch?.status === "needs_human_review" || branch?.status === "needs_revision" ? <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-950">Human sign-off: {branch.approver_role}</p>
+            <p className="mt-1 text-xs text-amber-900">Review the draft and evaluation snapshot before deciding. This gate pauses only this department.</p>
+            <textarea value={approvalComments[actionKey] ?? ""} onChange={(event) => setApprovalComment(actionKey, event.target.value)} placeholder="Optional approval note, or required reason for changes" className="mt-3 min-h-20 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-700" />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => onSubmitApproval(ticket.id, department.department, "approve")} disabled={approvalAction === actionKey} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-60">Approve section</button>
+              <button type="button" onClick={() => onSubmitApproval(ticket.id, department.department, "request_changes")} disabled={approvalAction === actionKey} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-60">Request changes</button>
+              <button type="button" onClick={() => onSubmitApproval(ticket.id, department.department, "reject")} disabled={approvalAction === actionKey} className="rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-60">Reject section</button>
+            </div>
+          </div> : null}
+        </div>;
+      })}
     </div>
   </section>;
 }

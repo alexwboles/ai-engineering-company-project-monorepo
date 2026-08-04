@@ -19,6 +19,11 @@ class RfpTicketStatus(StrEnum):
     UNDER_EVALUATION = "under_evaluation"
     NEEDS_HUMAN_REVIEW = "needs_human_review"
     READY_FOR_APPROVAL = "ready_for_approval"
+    AWAITING_APPROVAL = "awaiting_approval"
+    PARTIALLY_APPROVED = "partially_approved"
+    NEEDS_REVISION = "needs_revision"
+    ARBITRATING = "arbitrating"
+    PRODUCING = "producing"
 
 
 class RfpTicket(BaseModel):
@@ -37,5 +42,7 @@ class RfpTicket(BaseModel):
     classifier: dict[str, Any] | None = None
     result: dict[str, Any] | None = None
     response: dict[str, Any] | None = None
+    approval: dict[str, Any] | None = None
+    final_document: dict[str, Any] | None = None
     error: str | None = None
     owner_user_id: int | None = None
