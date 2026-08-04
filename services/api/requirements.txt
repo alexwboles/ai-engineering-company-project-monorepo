@@ -11,3 +11,6 @@ pandas>=2.2.3
 psycopg2-binary>=2.9.12
 sqlmodel>=0.0.39
 prefect>=3
+celery>=5.3
+redis>=5
+flower>=2.0

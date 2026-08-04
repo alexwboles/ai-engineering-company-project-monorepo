@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import csv
-import io
 import logging
 import os
-from dataclasses import asdict
-from typing import Any
+import uuid
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -25,6 +23,7 @@ try:
         suppliers_router,
         telemetry_router,
         telemetry_report_router,
+        tasks_router,
         users_router,
     )
 except ModuleNotFoundError:
@@ -38,6 +37,7 @@ except ModuleNotFoundError:
         suppliers_router,
         telemetry_report_router,
         telemetry_router,
+        tasks_router,
         users_router,
     )
 
@@ -52,16 +52,9 @@ except ModuleNotFoundError:
     from reporting.routes import router as reporting_router
 
 try:
-    # Works when imported as services.api.main from repository root.
-    from services.api.incident_analysis import (
-        analyze_incident_rows,
-        now_iso,
-        summary_to_csv_text,
-        summary_to_dict,
-    )
+    from services.tasks.report_tasks import analyze_incident_csv
 except ModuleNotFoundError:
-    # Works when running uvicorn from services/api with module path main:app.
-    from incident_analysis import analyze_incident_rows, now_iso, summary_to_csv_text, summary_to_dict
+    from tasks.report_tasks import analyze_incident_csv
 
 logger = logging.getLogger("healthcore.api")
 TELEMETRY_ENDPOINT = os.getenv("TELEMETRY_ENDPOINT", "http://localhost:8000/telemetry/events")
@@ -78,8 +71,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_last_analysis_summary_csv: str | None = None
-_last_analysis_payload: dict[str, Any] | None = None
+TASK_INPUT_DIR = Path(__file__).resolve().parent / "data" / "celery_tasks"
+LATEST_RESULTS_CSV = TASK_INPUT_DIR / "results" / "latest_results.csv"
 
 app.include_router(suppliers_router)
 app.include_router(users_router)
@@ -90,6 +83,7 @@ app.include_router(telemetry_router)
 app.include_router(telemetry_report_router)
 app.include_router(inventory_router)
 app.include_router(reporting_router)
+app.include_router(tasks_router)
 
 
 @app.on_event("startup")
@@ -131,10 +125,8 @@ def health() -> dict[str, str]:
 @app.post("/api/incidents/analyze")
 async def analyze_incidents(
     file: UploadFile = File(...), current_user=Depends(get_current_user)
-) -> dict[str, Any]:
+) -> JSONResponse:
     _ = current_user
-    global _last_analysis_payload
-    global _last_analysis_summary_csv
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="A CSV file is required.")
@@ -142,59 +134,45 @@ async def analyze_incidents(
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload a .csv file.")
 
-    try:
-        content = await file.read()
-    except OSError:
-        logger.exception("Failed to read uploaded CSV file")
-        raise HTTPException(status_code=400, detail="Unable to read the uploaded file.") from None
+    TASK_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    input_path = TASK_INPUT_DIR / f"{uuid.uuid4().hex}.csv"
 
-    if not content:
+    try:
+        with input_path.open("wb") as destination:
+            while chunk := await file.read(1024 * 1024):
+                destination.write(chunk)
+    except OSError:
+        input_path.unlink(missing_ok=True)
+        logger.exception("Failed to stage uploaded CSV file")
+        raise HTTPException(status_code=400, detail="Unable to stage the uploaded file.") from None
+    finally:
+        await file.close()
+
+    if input_path.stat().st_size == 0:
+        input_path.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     try:
-        text = content.decode("utf-8-sig")
-    except UnicodeDecodeError as exc:
-        raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from exc
-
-    try:
-        reader = csv.DictReader(io.StringIO(text))
-        if reader.fieldnames is None:
-            raise ValueError("CSV header row is missing.")
-    except (csv.Error, ValueError) as exc:
-        raise HTTPException(
-            status_code=400,
-            detail="Unable to process CSV. Please check the file format and try again.",
-        ) from exc
-
-    try:
-        summary, invalid_records, _valid_rows = analyze_incident_rows(reader)
+        task = analyze_incident_csv.delay(str(input_path))
     except Exception:
-        logger.exception("Incident CSV analysis failed")
+        input_path.unlink(missing_ok=True)
+        logger.exception("Unable to enqueue incident CSV analysis")
         raise HTTPException(
-            status_code=500,
-            detail="Unable to analyze the uploaded CSV right now. Please try again.",
+            status_code=503,
+            detail="The analysis queue is temporarily unavailable. Please try again.",
         ) from None
 
-    payload = {
-        "generated_at": now_iso(),
-        "summary": summary_to_dict(summary),
-        "invalid_records": [asdict(issue) for issue in invalid_records],
-    }
-
-    _last_analysis_payload = payload
-    _last_analysis_summary_csv = summary_to_csv_text(summary)
-
-    return payload
+    return JSONResponse(status_code=202, content={"task_id": task.id})
 
 
 @app.get("/api/incidents/results/export")
 def export_last_results(current_user=Depends(get_current_user)) -> Response:
     _ = current_user
-    if _last_analysis_summary_csv is None:
+    if not LATEST_RESULTS_CSV.exists():
         raise HTTPException(status_code=404, detail="No analysis available to export yet.")
 
     return Response(
-        content=_last_analysis_summary_csv,
+        content=LATEST_RESULTS_CSV.read_text(encoding="utf-8"),
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=results.csv"},
     )

@@ -51,10 +51,58 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       SUPABASE_TELEMETRY_TABLE: ${SUPABASE_TELEMETRY_TABLE:-telemetry_events}
       DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     ports:
       - "8000:8000"
     volumes:
-      - ./services:/workspace/services
+      - ./:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - healthcore-dev
+
+  worker:
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    working_dir: /workspace/services/api
+    command: ["celery", "-A", "services.celery_app", "worker", "--loglevel=info", "--concurrency=1", "--events"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PYTHONPATH: /workspace
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - ./:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - healthcore-dev
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - healthcore-dev
+
+  flower:
+    image: mher/flower:2.0
+    command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
+    environment:
+      CELERY_BROKER_URL: ${REDIS_URL:-redis://redis:6379/0}
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - healthcore-dev
 
