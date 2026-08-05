@@ -1,0 +1,135 @@
+services:
+  ui:
+    build:
+      context: ./uis
+      dockerfile: Dockerfile
+    working_dir: /workspace/uis
+    command: ["/usr/local/bin/start.sh"]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_AUTH_API_URL: ${NEXT_PUBLIC_AUTH_API_URL}
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    volumes:
+      - ./:/workspace
+      - ui_website_node_modules:/workspace/uis/website/node_modules
+      - ui_backoffice_node_modules:/workspace/uis/backoffice/node_modules
+    depends_on:
+      - api
+    networks:
+      - healthcore-dev
+
+  api:
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    working_dir: /workspace/services/api
+    command:
+      - uvicorn
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /workspace/services/api
+    environment:
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      PYTHONPATH: /workspace
+      RESET_TOKEN_EXPIRE_MINUTES: ${RESET_TOKEN_EXPIRE_MINUTES}
+      RESET_TOKEN_SECRET_KEY: ${RESET_TOKEN_SECRET_KEY}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      FRONTEND_RESET_PASSWORD_URL: ${FRONTEND_RESET_PASSWORD_URL}
+      TELEMETRY_ENDPOINT: ${TELEMETRY_ENDPOINT:-http://api:8000/telemetry/events}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_TELEMETRY_TABLE: ${SUPABASE_TELEMETRY_TABLE:-telemetry_events}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-healthcore_knowledge_base}
+      RAG_API_KEY: ${RAG_API_KEY}
+      RAG_BASE_URL: ${RAG_BASE_URL}
+      RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-4geeks-healthcore-embedding}
+      RAG_GENERATION_MODEL: ${RAG_GENERATION_MODEL:-4geeks-healthcore-generation}
+      RAG_EMBEDDING_DIMENSION: ${RAG_EMBEDDING_DIMENSION:-384}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    networks:
+      - healthcore-dev
+
+  worker:
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    working_dir: /workspace/services/api
+    command: ["celery", "-A", "services.celery_app", "worker", "--loglevel=info", "--concurrency=1", "--events"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PYTHONPATH: /workspace
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - ./:/workspace
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - healthcore-dev
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - healthcore-dev
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    networks:
+      - healthcore-dev
+
+  flower:
+    image: mher/flower:2.0
+    command: ["celery", "--broker=redis://redis:6379/0", "flower", "--port=5555"]
+    environment:
+      CELERY_BROKER_URL: ${REDIS_URL:-redis://redis:6379/0}
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - healthcore-dev
+
+networks:
+  healthcore-dev:
+    driver: bridge
+
+volumes:
+  ui_website_node_modules:
+  ui_backoffice_node_modules:
+  qdrant_storage:
