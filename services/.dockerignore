@@ -1,0 +1,11 @@
+__pycache__
+**/__pycache__
+*.pyc
+**/*.pyc
+.env
+*.log
+**/*.log
+tests
+**/tests
+.coverage
+*.egg-info

@@ -82,8 +82,8 @@ export function CandidateForm({ title, submitLabel, initialCandidate, onSubmit }
         experience_years: experienceYears,
       });
       setSuccess("Candidate record saved successfully.");
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Unable to submit candidate form.");
+    } catch {
+      setError("Unable to save this candidate. Please review your input and try again.");
     } finally {
       setIsSubmitting(false);
     }
