@@ -63,6 +63,10 @@ services:
       INVENTORY_API_BASE_URL: ${INVENTORY_API_BASE_URL:-http://api:8000}
       AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
       AGENT_TOOL_TIMEOUT_SECONDS: ${AGENT_TOOL_TIMEOUT_SECONDS:-4.0}
+      MCP_SERVER_URL: ${MCP_SERVER_URL:-http://mcp:8001/mcp}
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-streamable_http}
+      MCP_ACCESS_TOKEN: ${MCP_ACCESS_TOKEN:-}
+      MCP_CLIENT_TIMEOUT_SECONDS: ${MCP_CLIENT_TIMEOUT_SECONDS:-10.0}
     ports:
       - "8000:8000"
     volumes:
@@ -103,6 +107,44 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - healthcore-dev
+
+  mcp:
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    working_dir: /workspace
+    command:
+      - uvicorn
+      - mcps.company_tools.server:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8001"
+      - --reload
+      - --reload-dir
+      - /workspace/mcps
+    environment:
+      PYTHONPATH: /workspace
+      INCIDENTS_API_BASE_URL: ${INCIDENTS_API_BASE_URL:-http://api:8000}
+      INVENTORY_API_BASE_URL: ${INVENTORY_API_BASE_URL:-http://api:8000}
+      MCP_AUTH_ISSUER: ${MCP_AUTH_ISSUER:-http://localhost:8001}
+      MCP_AUTHORIZATION_ENDPOINT: ${MCP_AUTHORIZATION_ENDPOINT:-http://localhost:8001/authorize}
+      MCP_TOKEN_ENDPOINT: ${MCP_TOKEN_ENDPOINT:-http://localhost:8001/token}
+      MCP_AUTH_JWKS_URI: ${MCP_AUTH_JWKS_URI:-}
+      MCP_AUDIENCE: ${MCP_AUDIENCE:-}
+      MCP_RESOURCE_URL: ${MCP_RESOURCE_URL:-http://localhost:8001/mcp}
+      MCP_JWT_SECRET: ${MCP_JWT_SECRET:-}
+      MCP_JWT_ALGORITHM: ${MCP_JWT_ALGORITHM:-HS256}
+      MCP_UPSTREAM_TOKEN: ${MCP_UPSTREAM_TOKEN:-}
+      MCP_UPSTREAM_TIMEOUT_SECONDS: ${MCP_UPSTREAM_TIMEOUT_SECONDS:-4.0}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./:/workspace
+    depends_on:
+      - api
     networks:
       - healthcore-dev
 

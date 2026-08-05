@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import httpx
-
 from services.agent import nodes
 from services.agent.graph import invoke_agent
 from services.agent.tools import (
@@ -15,43 +13,60 @@ from services.agent.tools import (
 
 def test_ticket_tool_uses_real_incident_route_and_explicit_timeout(monkeypatch) -> None:
     calls: dict[str, object] = {}
-    request = httpx.Request("GET", "http://incident-manager/api/incidents/482")
-    response = httpx.Response(
-        200,
-        json={
-            "id": 482,
-            "status": "in_progress",
-            "category": "access",
-            "origin": "support",
-            "created_at": "2026-08-04T10:00:00Z",
-            "updated_at": "2026-08-04T11:00:00Z",
-        },
-        request=request,
-    )
 
-    def fake_get(url, **kwargs):
-        calls["url"] = url
-        calls.update(kwargs)
-        return response
+    def fake_mcp_call(tool_name, arguments):
+        calls["tool_name"] = tool_name
+        calls["arguments"] = arguments
+        return {
+            "ok": True,
+            "incident": {
+                "id": 482,
+                "status": "in_progress",
+                "category": "access",
+                "origin": "support",
+                "created_at": "2026-08-04T10:00:00Z",
+                "updated_at": "2026-08-04T11:00:00Z",
+            },
+        }
 
-    monkeypatch.setattr("services.agent.tools.httpx.get", fake_get)
+    monkeypatch.setattr("services.agent.tools.call_mcp_tool", fake_mcp_call)
     result = lookup_ticket(TicketLookupInput(ticket_id=482))
 
     assert result.found is True
     assert result.ticket_id == 482
     assert result.status == "in_progress"
-    assert calls["url"] == "http://localhost:8000/api/incidents/482"
-    assert calls["timeout"] == 4.0
+    assert calls["tool_name"] == "manage_incident_ticket"
+    assert calls["arguments"] == {"action": "get_status", "ticket_id": 482}
+
+
+def test_status_filter_ticket_tool_uses_mcp_filter(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(
+        "services.agent.tools.call_mcp_tool",
+        lambda tool_name, arguments: calls.update(tool_name=tool_name, arguments=arguments)
+        or {"ok": True, "incidents": [{"id": 482, "status": "open"}]},
+    )
+
+    result = lookup_ticket(TicketLookupInput(status="open"))
+
+    assert result.found is True
+    assert result.incidents == [{"id": 482, "status": "open"}]
+    assert calls == {
+        "tool_name": "manage_incident_ticket",
+        "arguments": {"action": "get_status", "status": "open"},
+    }
 
 
 def test_inventory_tool_reads_current_stock_and_filters_by_product(monkeypatch) -> None:
-    request = httpx.Request("GET", "http://inventory-manager/inventory/products")
-    response = httpx.Response(
-        200,
-        json=[{"id": 7, "name": "Diagnostic supplies", "sku": "DS-007", "current_stock": 18}],
-        request=request,
+    monkeypatch.setattr(
+        "services.agent.tools.call_mcp_tool",
+        lambda _tool_name, _arguments: {
+            "ok": True,
+            "products": [
+                {"id": 7, "name": "Diagnostic supplies", "sku": "DS-007", "current_stock": 18}
+            ],
+        },
     )
-    monkeypatch.setattr("services.agent.tools.httpx.get", lambda _url, **_kwargs: response)
 
     result = lookup_inventory(InventoryLookupInput(search="diagnostic"))
 
