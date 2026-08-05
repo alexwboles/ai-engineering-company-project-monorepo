@@ -26,6 +26,7 @@ try:
         tasks_router,
         rfp_router,
         agent_router,
+        knowledge_router,
         users_router,
     )
 except ModuleNotFoundError:
@@ -42,6 +43,7 @@ except ModuleNotFoundError:
         tasks_router,
         rfp_router,
         agent_router,
+        knowledge_router,
         users_router,
     )
 
@@ -90,6 +92,7 @@ app.include_router(reporting_router)
 app.include_router(tasks_router)
 app.include_router(rfp_router)
 app.include_router(agent_router)
+app.include_router(knowledge_router)
 
 
 @app.on_event("startup")

@@ -50,6 +50,9 @@ export function NavClient() {
       <Link href="/rfp" className="rounded-full bg-violet-100 px-3 py-1 font-medium text-violet-800 hover:bg-violet-200">
         RFP Intake
       </Link>
+      <Link href="/knowledge" className="rounded-full bg-teal-100 px-3 py-1 font-medium text-teal-800 hover:bg-teal-200">
+        Knowledge
+      </Link>
       <Link href="/account/profile" className="rounded-full bg-indigo-100 px-3 py-1 font-medium text-indigo-800 hover:bg-indigo-200">
         Profile
       </Link>

@@ -9,6 +9,7 @@ from .inventory import router as inventory_router
 from .tasks import router as tasks_router
 from .rfp import router as rfp_router
 from .agent import router as agent_router
+from .knowledge import router as knowledge_router
 
 __all__ = [
     "suppliers_router",
@@ -22,4 +23,5 @@ __all__ = [
     "tasks_router",
     "rfp_router",
     "agent_router",
+    "knowledge_router",
 ]

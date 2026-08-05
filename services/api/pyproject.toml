@@ -27,6 +27,8 @@ dependencies = [
   "scikit-learn>=1.9.0",
   "matplotlib>=3.11.1",
   "scipy>=1.17.1",
+  "qdrant-client>=1.19.0",
+  "openai>=2.53.0",
 ]
 
 [project.scripts]
