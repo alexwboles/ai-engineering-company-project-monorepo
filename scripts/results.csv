@@ -1,0 +1,15 @@
+metric,value
+total_records,100
+valid_records,80
+invalid_records,20
+invalid_reason.invalid_category,10
+invalid_reason.invalid_status,5
+invalid_reason.missing_required_field,2
+invalid_reason.out_of_range,3
+category.complaint,26
+category.operational_failure,27
+category.request,27
+status.closed,32
+status.discarded,16
+status.open,32
+average_satisfaction_closed,3.8063
