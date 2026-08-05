@@ -163,7 +163,10 @@ def tool_failure_node(state: AgentState) -> dict[str, Any]:
 
 def query_node(state: AgentState) -> dict[str, Any]:
     try:
-        context = isolate_context(state.get("retrieved_context") or [], "rag")
+        context = [
+            *isolate_context(state.get("retrieved_context") or [], "rag"),
+            *isolate_context(state.get("memory_context") or [], "approved_memory"),
+        ]
         answer = generate_answer(state["question"], context)
     except Exception:
         logger.exception("Support-agent generation failed: trace_id=%s", state.get("trace_id"))
@@ -188,6 +191,7 @@ def synthesize_answer_node(state: AgentState) -> dict[str, Any]:
     ]
     context = [
         *isolate_context(state.get("retrieved_context") or [], "rag"),
+        *isolate_context(state.get("memory_context") or [], "approved_memory"),
         *isolate_context(tool_context, "mcp"),
     ]
     try:

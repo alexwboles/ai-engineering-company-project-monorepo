@@ -18,6 +18,7 @@ class AgentState(TypedDict, total=False):
     route_reason: str
     requested_tools: list[str]
     retrieved_context: list[dict[str, Any]]
+    memory_context: list[dict[str, Any]]
     tool_results: list[dict[str, Any]]
     answer: str | None
     final_answer: str | None

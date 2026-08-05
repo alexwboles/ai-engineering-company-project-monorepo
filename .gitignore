@@ -20,6 +20,7 @@ yarn-error.log*
 services/api/data/celery_tasks/
 services/api/data/rfp_approval_checkpoints.sqlite3*
 services/api/data/rfp_intake/
+data/memory/*.sqlite3*
 
 # OS/editor
 .DS_Store
