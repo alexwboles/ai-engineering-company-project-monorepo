@@ -9,6 +9,7 @@ from typing import Any
 
 from data.pipelines.rag import generate_answer, retrieve
 
+from .harness.external_content import isolate_context
 from .state import AgentState, TraceStep
 from .tools import (
     InventoryLookupInput,
@@ -162,7 +163,8 @@ def tool_failure_node(state: AgentState) -> dict[str, Any]:
 
 def query_node(state: AgentState) -> dict[str, Any]:
     try:
-        answer = generate_answer(state["question"], state.get("retrieved_context") or [])
+        context = isolate_context(state.get("retrieved_context") or [], "rag")
+        answer = generate_answer(state["question"], context)
     except Exception:
         logger.exception("Support-agent generation failed: trace_id=%s", state.get("trace_id"))
         return {
@@ -184,7 +186,10 @@ def synthesize_answer_node(state: AgentState) -> dict[str, Any]:
         for item in state.get("tool_results", [])
         if not item.get("error")
     ]
-    context = [*(state.get("retrieved_context") or []), *tool_context]
+    context = [
+        *isolate_context(state.get("retrieved_context") or [], "rag"),
+        *isolate_context(tool_context, "mcp"),
+    ]
     try:
         answer = generate_answer(state["question"], context)
     except Exception:

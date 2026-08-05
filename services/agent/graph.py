@@ -8,6 +8,9 @@ from uuid import uuid4
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from .harness.input_guards import classify_input
+from .harness.observability import get_guardrail_trace, store_guardrail_trace
+from .harness.output_guards import validate_agent_output
 from .nodes import (
     lookup_inventory_node,
     lookup_ticket_node,
@@ -122,17 +125,50 @@ AGENT_GRAPH = build_agent_graph(_CHECKPOINTER)
 
 def invoke_agent(question: str, *, trace_id: str | None = None) -> dict[str, Any]:
     run_id = trace_id or f"agent-{uuid4().hex}"
+    decision = classify_input(question, trace_id=run_id)
+    if decision.action != "allow":
+        result = {
+            "question": str(question or "").strip(),
+            "route": "guardrail",
+            "route_reason": decision.reason,
+            "answer": decision.response,
+            "final_answer": decision.response,
+            "error": None,
+            "trace_id": run_id,
+            "trace_steps": [
+                {
+                    "node": "input_guardrail",
+                    "order": 1,
+                    "output_summary": f"action={decision.action}; guardrail={decision.guardrail}",
+                }
+            ],
+            "trace": [
+                {
+                    "node": "input_guardrail",
+                    "order": 1,
+                    "output_summary": f"action={decision.action}; guardrail={decision.guardrail}",
+                }
+            ],
+            "guardrail": decision.guardrail,
+        }
+        store_guardrail_trace(run_id, result)
+        return result
     result = AGENT_GRAPH.invoke(
         {"question": question, "trace_id": run_id, "trace_steps": []},
         config={"configurable": {"thread_id": run_id}},
     )
-    return {**result, "trace_id": run_id}
+    safe_answer = (
+        None
+        if result.get("error") and result.get("answer") is None
+        else validate_agent_output(result.get("answer"), trace_id=run_id)
+    )
+    return {**result, "answer": safe_answer, "final_answer": safe_answer, "trace_id": run_id}
 
 
 def get_agent_trace(trace_id: str) -> dict[str, Any] | None:
     snapshot = AGENT_GRAPH.get_state({"configurable": {"thread_id": trace_id}})
     if not snapshot or not snapshot.values:
-        return None
+        return get_guardrail_trace(trace_id)
     values = snapshot.values
     return {
         "trace_id": trace_id,

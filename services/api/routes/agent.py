@@ -9,8 +9,10 @@ from pydantic import BaseModel
 
 try:
     from services.agent.graph import get_agent_trace, invoke_agent
+    from services.agent.harness.observability import guardrail_summary
 except ModuleNotFoundError:
     from agent.graph import get_agent_trace, invoke_agent
+    from agent.harness.observability import guardrail_summary
 
 
 router = APIRouter(prefix="/agent", tags=["support-agent"])
@@ -46,3 +48,10 @@ def get_agent_run_trace(trace_id: str) -> dict[str, Any]:
     if trace is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent trace not found.")
     return trace
+
+
+@router.get("/guardrails/summary")
+def get_guardrail_summary() -> dict[str, int]:
+    """Expose process-local guardrail counts for a test or operations session."""
+
+    return guardrail_summary()
