@@ -8,18 +8,49 @@ from uuid import uuid4
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from .nodes import no_context_node, query_node, receive_question, retrieve_node
+from .nodes import (
+    lookup_inventory_node,
+    lookup_ticket_node,
+    no_context_node,
+    query_node,
+    receive_question,
+    retrieve_node,
+    route_intent,
+    synthesize_answer_node,
+    tool_failure_node,
+)
 from .state import AgentState
 
 
 def after_receive(state: AgentState) -> str:
-    return "end" if state.get("error") else "retrieve"
+    return "end" if state.get("error") else "route_intent"
+
+
+def after_route(state: AgentState) -> str:
+    return {
+        "rag": "retrieve",
+        "ticket": "lookup_ticket",
+        "inventory": "lookup_inventory",
+        "both": "retrieve",
+    }.get(state.get("route", "rag"), "retrieve")
 
 
 def after_retrieve(state: AgentState) -> str:
     if state.get("error"):
         return "end"
+    if state.get("route") == "both":
+        return "lookup_ticket"
     return "no_context" if not state.get("retrieved_context") else "query"
+
+
+def after_ticket(state: AgentState) -> str:
+    if state.get("route") == "both":
+        return "lookup_inventory"
+    return "tool_failure" if _has_tool_failure(state) else "synthesize_answer"
+
+
+def after_inventory(state: AgentState) -> str:
+    return "tool_failure" if _has_tool_failure(state) else "synthesize_answer"
 
 
 def build_agent_graph(checkpointer: Any | None = None):
@@ -27,19 +58,62 @@ def build_agent_graph(checkpointer: Any | None = None):
 
     builder = StateGraph(AgentState)
     builder.add_node("receive_question", receive_question)
+    builder.add_node("route_intent", route_intent)
     builder.add_node("retrieve", retrieve_node)
+    builder.add_node("lookup_ticket", lookup_ticket_node)
+    builder.add_node("lookup_inventory", lookup_inventory_node)
     builder.add_node("no_context", no_context_node)
     builder.add_node("query", query_node)
+    builder.add_node("handle_tool_failure", tool_failure_node)
+    builder.add_node("synthesize_answer", synthesize_answer_node)
     builder.add_edge(START, "receive_question")
-    builder.add_conditional_edges("receive_question", after_receive, {"retrieve": "retrieve", "end": END})
+    builder.add_conditional_edges(
+        "receive_question",
+        after_receive,
+        {"route_intent": "route_intent", "end": END},
+    )
+    builder.add_conditional_edges(
+        "route_intent",
+        after_route,
+        {
+            "retrieve": "retrieve",
+            "lookup_ticket": "lookup_ticket",
+            "lookup_inventory": "lookup_inventory",
+        },
+    )
     builder.add_conditional_edges(
         "retrieve",
         after_retrieve,
-        {"query": "query", "no_context": "no_context", "end": END},
+        {
+            "query": "query",
+            "no_context": "no_context",
+            "lookup_ticket": "lookup_ticket",
+            "end": END,
+        },
+    )
+    builder.add_conditional_edges(
+        "lookup_ticket",
+        after_ticket,
+        {
+            "lookup_inventory": "lookup_inventory",
+            "tool_failure": "handle_tool_failure",
+            "synthesize_answer": "synthesize_answer",
+        },
+    )
+    builder.add_conditional_edges(
+        "lookup_inventory",
+        after_inventory,
+        {"tool_failure": "handle_tool_failure", "synthesize_answer": "synthesize_answer"},
     )
     builder.add_edge("query", END)
     builder.add_edge("no_context", END)
+    builder.add_edge("handle_tool_failure", END)
+    builder.add_edge("synthesize_answer", END)
     return builder.compile(checkpointer=checkpointer or MemorySaver())
+
+
+def _has_tool_failure(state: AgentState) -> bool:
+    return any(bool(item.get("error")) for item in state.get("tool_results", []))
 
 
 _CHECKPOINTER = MemorySaver()
@@ -62,7 +136,10 @@ def get_agent_trace(trace_id: str) -> dict[str, Any] | None:
     values = snapshot.values
     return {
         "trace_id": trace_id,
+        "route": values.get("route"),
+        "route_reason": values.get("route_reason"),
         "trace": values.get("trace_steps", []),
+        "tool_results": values.get("tool_results", []),
         "answer": values.get("answer"),
         "error": values.get("error"),
     }

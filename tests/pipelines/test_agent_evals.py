@@ -14,7 +14,7 @@ def test_agent_trace_records_retrieve_before_query(monkeypatch) -> None:
     result = invoke_agent("Which policy applies?", trace_id="eval-node-order")
     nodes = [step["node"] for step in result["trace_steps"]]
 
-    assert nodes == ["receive_question", "retrieve", "query"]
+    assert nodes == ["receive_question", "route_intent", "retrieve", "query"]
     assert get_agent_trace("eval-node-order")["trace"] == result["trace_steps"]
 
 

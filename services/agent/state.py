@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Annotated, TypedDict
 import operator
+from typing import Annotated, Any, TypedDict
 
 
 class TraceStep(TypedDict):
@@ -14,8 +14,13 @@ class TraceStep(TypedDict):
 
 class AgentState(TypedDict, total=False):
     question: str
+    route: str
+    route_reason: str
+    requested_tools: list[str]
     retrieved_context: list[dict[str, Any]]
+    tool_results: list[dict[str, Any]]
     answer: str | None
+    final_answer: str | None
     error: str | None
     trace_id: str
     trace_steps: Annotated[list[TraceStep], operator.add]
