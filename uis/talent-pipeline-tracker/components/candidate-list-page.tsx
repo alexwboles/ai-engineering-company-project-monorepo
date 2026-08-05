@@ -25,6 +25,7 @@ export function CandidateListPage() {
   const [total, setTotal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const status = normalizeParam(searchParams.get("status"));
   const stage = normalizeParam(searchParams.get("stage"));
@@ -43,17 +44,17 @@ export function CandidateListPage() {
           limit: 100,
         });
 
-        setRecords(response.data);
-        setTotal(response.total);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Unable to fetch candidates.");
+        setRecords(response?.data ?? []);
+        setTotal(response?.total ?? 0);
+      } catch {
+        setError("Unable to load candidates right now. Please try again.");
       } finally {
         setIsLoading(false);
       }
     }
 
     void loadRecords();
-  }, [status, stage, search]);
+  }, [status, stage, search, reloadToken]);
 
   const emptyStateMessage = useMemo(() => {
     if (status || stage || search) {
@@ -134,7 +135,21 @@ export function CandidateListPage() {
       </section>
 
       {isLoading ? <p className="rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700">Loading candidate pipeline...</p> : null}
-      {error ? <p className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
+      {error ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() => setReloadToken((current) => current + 1)}
+            className="rounded bg-rose-700 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-800"
+          >
+            Retry
+          </button>
+          <Link href="/" className="text-xs font-semibold underline underline-offset-2">
+            Back to home
+          </Link>
+        </div>
+      ) : null}
 
       {!isLoading && !error ? (
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">

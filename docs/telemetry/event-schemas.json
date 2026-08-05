@@ -1,0 +1,411 @@
+{
+  "schemaVersion": "1.0.0",
+  "planName": "HealthCore Telemetry Plan",
+  "eventEnvelope": {
+    "requiredFields": [
+      { "name": "eventId", "type": "string", "format": "uuid", "required": true, "description": "Unique event identifier." },
+      { "name": "timestamp", "type": "string", "format": "date-time", "required": true, "description": "ISO 8601 UTC timestamp." },
+      { "name": "sessionId", "type": "string", "required": true, "description": "Opaque browser or API session identifier." },
+      { "name": "userId", "type": ["string", "null"], "required": true, "description": "Opaque internal user identifier, or null for anonymous activity." },
+      { "name": "event_type", "type": "string", "format": "entity_action", "required": true, "description": "Consistent lower_snake_case entity_action name." },
+      { "name": "schemaVersion", "type": "string", "required": true, "description": "Version of the event payload schema." },
+      { "name": "requestId", "type": "string", "required": true, "description": "Correlation ID shared across frontend, backend, and logs." },
+      { "name": "properties", "type": "object", "required": true, "description": "Event-specific payload restricted to the allowlist for the event." }
+    ],
+    "rules": [
+      "Reject events with any property outside the documented allowlist.",
+      "Keep userId and sessionId opaque; never use email addresses, names, or other direct identifiers.",
+      "Propagate requestId from frontend to backend so telemetry can be joined to logs and traces.",
+      "Increment schemaVersion only when a breaking payload change is introduced."
+    ]
+  },
+  "events": [
+    {
+      "event_type": "claim_submitted",
+      "class": "mandatory",
+      "delivery": "stream",
+      "description": "Claim submitted into the billing flow.",
+      "hypothesis": "We need to know whether claims are entering the system with the right payer, location, and service mix.",
+      "decision": "Tune pre-submission validation and coding review.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Use opaque claim and payer identifiers only.",
+      "propertyAllowlist": ["claimId", "locationId", "payerId", "payerName", "serviceType", "claimAmount", "resubmitted", "submissionChannel"],
+      "properties": [
+        { "name": "claimId", "type": "string", "required": true, "description": "Opaque claim identifier." },
+        { "name": "locationId", "type": "string", "required": true, "description": "Clinic identifier." },
+        { "name": "payerId", "type": "string", "required": true, "description": "Insurance payer identifier." },
+        { "name": "payerName", "type": "string", "required": true, "description": "Payer display name." },
+        { "name": "serviceType", "type": "string", "required": true, "description": "Type of care delivered." },
+        { "name": "claimAmount", "type": "number", "required": true, "description": "Amount billed in USD." },
+        { "name": "resubmitted", "type": "boolean", "required": true, "description": "Whether the claim was resubmitted after denial." },
+        { "name": "submissionChannel", "type": "string", "required": false, "description": "Channel used to submit the claim." }
+      ]
+    },
+    {
+      "event_type": "claim_denied",
+      "class": "mandatory",
+      "delivery": "stream",
+      "description": "Claim denial outcome and reason.",
+      "hypothesis": "We need to know which payer/location combinations and denial reasons are creating the most rework.",
+      "decision": "Prioritize appeals and coding follow-up.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Emit denial reasons and operational IDs only.",
+      "propertyAllowlist": ["claimId", "locationId", "payerId", "denialReason", "resubmitted", "claimAmount", "daysSinceSubmission", "appealEligible"],
+      "properties": [
+        { "name": "claimId", "type": "string", "required": true, "description": "Opaque claim identifier." },
+        { "name": "locationId", "type": "string", "required": true, "description": "Clinic identifier." },
+        { "name": "payerId", "type": "string", "required": true, "description": "Insurance payer identifier." },
+        { "name": "denialReason", "type": "string", "required": true, "description": "Coded denial reason." },
+        { "name": "resubmitted", "type": "boolean", "required": true, "description": "Whether the claim was resubmitted after denial." },
+        { "name": "claimAmount", "type": "number", "required": true, "description": "Amount billed in USD." },
+        { "name": "daysSinceSubmission", "type": "number", "required": false, "description": "Days elapsed since submission." },
+        { "name": "appealEligible", "type": "boolean", "required": false, "description": "Whether the denial can be appealed." }
+      ]
+    },
+    {
+      "event_type": "claim_validation_failed",
+      "class": "mandatory",
+      "delivery": "stream",
+      "description": "Validation failure for claim input or payload.",
+      "hypothesis": "We need to know which fields and sources are failing validation.",
+      "decision": "Fix validation rules before bad claims reach downstream processing.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Emit field names and error codes only.",
+      "propertyAllowlist": ["claimId", "locationId", "validationErrors", "invalidFields", "source", "severity"],
+      "properties": [
+        { "name": "claimId", "type": "string", "required": false, "description": "Opaque claim identifier if available." },
+        { "name": "locationId", "type": "string", "required": false, "description": "Clinic identifier." },
+        { "name": "validationErrors", "type": "array", "required": true, "description": "Validation error codes or messages." },
+        { "name": "invalidFields", "type": "array", "required": true, "description": "Field names that failed validation." },
+        { "name": "source", "type": "string", "required": true, "description": "Where the invalid payload originated." },
+        { "name": "severity", "type": "string", "required": true, "description": "Severity classification for the failure." }
+      ]
+    },
+    {
+      "event_type": "appointment_scheduled",
+      "class": "mandatory",
+      "delivery": "stream",
+      "description": "Appointment created in the scheduling flow.",
+      "hypothesis": "We need to know where and how visits are booked.",
+      "decision": "Adjust access, reminders, and staffing assumptions.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Do not emit patient names or contact details.",
+      "propertyAllowlist": ["appointmentId", "locationId", "serviceType", "scheduledDate", "scheduledTime", "channel", "leadTimeHours"],
+      "properties": [
+        { "name": "appointmentId", "type": "string", "required": true, "description": "Opaque appointment identifier." },
+        { "name": "locationId", "type": "string", "required": true, "description": "Clinic identifier." },
+        { "name": "serviceType", "type": "string", "required": true, "description": "Type of care scheduled." },
+        { "name": "scheduledDate", "type": "string", "required": true, "description": "ISO 8601 date string." },
+        { "name": "scheduledTime", "type": "string", "required": true, "description": "24-hour time string." },
+        { "name": "channel", "type": "string", "required": false, "description": "Booking channel." },
+        { "name": "leadTimeHours", "type": "number", "required": false, "description": "Hours between booking and visit." }
+      ]
+    },
+    {
+      "event_type": "appointment_no_show_marked",
+      "class": "mandatory",
+      "delivery": "stream",
+      "description": "Appointment marked as a no-show.",
+      "hypothesis": "We need to know which services, locations, and reminder patterns correlate with no-shows.",
+      "decision": "Target outreach and schedule design improvements.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Use coded reasons only and exclude free-text patient notes.",
+      "propertyAllowlist": ["appointmentId", "locationId", "serviceType", "noShowReasonCode", "reminderCount", "rescheduled"],
+      "properties": [
+        { "name": "appointmentId", "type": "string", "required": true, "description": "Opaque appointment identifier." },
+        { "name": "locationId", "type": "string", "required": true, "description": "Clinic identifier." },
+        { "name": "serviceType", "type": "string", "required": true, "description": "Type of care scheduled." },
+        { "name": "noShowReasonCode", "type": "string", "required": false, "description": "Coded reason for the no-show." },
+        { "name": "reminderCount", "type": "number", "required": false, "description": "Number of reminders sent before the visit." },
+        { "name": "rescheduled", "type": "boolean", "required": false, "description": "Whether the appointment was rescheduled." }
+      ]
+    },
+    {
+      "event_type": "appointment_completed",
+      "class": "mandatory",
+      "delivery": "stream",
+      "description": "Completed appointment lifecycle event.",
+      "hypothesis": "We need to know which visits actually close the loop.",
+      "decision": "Measure throughput and compare completion versus cancellation or no-show.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Keep the payload to operational visit fields only.",
+      "propertyAllowlist": ["appointmentId", "locationId", "serviceType", "visitDurationMinutes", "confirmedAtDeltaMinutes", "staffedByRole"],
+      "properties": [
+        { "name": "appointmentId", "type": "string", "required": true, "description": "Opaque appointment identifier." },
+        { "name": "locationId", "type": "string", "required": true, "description": "Clinic identifier." },
+        { "name": "serviceType", "type": "string", "required": true, "description": "Type of care completed." },
+        { "name": "visitDurationMinutes", "type": "number", "required": false, "description": "Visit duration in minutes." },
+        { "name": "confirmedAtDeltaMinutes", "type": "number", "required": false, "description": "Minutes between confirmation and completion." },
+        { "name": "staffedByRole", "type": "string", "required": false, "description": "Primary clinician or staff role on the visit." }
+      ]
+    },
+    {
+      "event_type": "clinician_cme_logged",
+      "class": "mandatory",
+      "delivery": "stream",
+      "description": "CME hours logged for a clinician.",
+      "hypothesis": "We need to know how quickly clinicians accumulate hours and from which source.",
+      "decision": "Intervene before compliance risk grows.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Use opaque clinician IDs only.",
+      "propertyAllowlist": ["clinicianId", "role", "cmeHoursLogged", "cmeHoursRequired", "source", "cycleYear"],
+      "properties": [
+        { "name": "clinicianId", "type": "string", "required": true, "description": "Opaque clinician identifier." },
+        { "name": "role", "type": "string", "required": true, "description": "Clinician role." },
+        { "name": "cmeHoursLogged", "type": "number", "required": true, "description": "Hours logged so far." },
+        { "name": "cmeHoursRequired", "type": "number", "required": true, "description": "Hours required for the cycle." },
+        { "name": "source", "type": "string", "required": false, "description": "Source system or workflow." },
+        { "name": "cycleYear", "type": "number", "required": true, "description": "CME cycle year." }
+      ]
+    },
+    {
+      "event_type": "clinician_compliance_calculated",
+      "class": "mandatory",
+      "delivery": "batch",
+      "description": "Periodic clinician compliance snapshot.",
+      "hypothesis": "We need to know who is on track, at risk, or overdue.",
+      "decision": "Focus compliance follow-up on the right people first.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Emit aggregate compliance status only.",
+      "propertyAllowlist": ["clinicianId", "role", "cmeHoursLogged", "cmeHoursRequired", "complianceStatus", "hoursRemaining", "daysUntilLicenceExpiry"],
+      "properties": [
+        { "name": "clinicianId", "type": "string", "required": true, "description": "Opaque clinician identifier." },
+        { "name": "role", "type": "string", "required": true, "description": "Clinician role." },
+        { "name": "cmeHoursLogged", "type": "number", "required": true, "description": "Hours logged so far." },
+        { "name": "cmeHoursRequired", "type": "number", "required": true, "description": "Hours required for the cycle." },
+        { "name": "complianceStatus", "type": "string", "required": true, "description": "Compliance bucket such as on_track or at_risk." },
+        { "name": "hoursRemaining", "type": "number", "required": true, "description": "Hours left to satisfy the requirement." },
+        { "name": "daysUntilLicenceExpiry", "type": "number", "required": false, "description": "Days remaining before licence expiry." }
+      ]
+    },
+    {
+      "event_type": "billing_denial_rate_calculated",
+      "class": "mandatory",
+      "delivery": "batch",
+      "description": "Periodic denial-rate roll-up by payer and location.",
+      "hypothesis": "We need to know denial rates by payer and location.",
+      "decision": "Reallocate denial-management effort and spot contract issues early.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Report aggregates only.",
+      "propertyAllowlist": ["payerId", "payerName", "locationId", "periodStart", "periodEnd", "totalClaims", "deniedClaims", "denialRate"],
+      "properties": [
+        { "name": "payerId", "type": "string", "required": true, "description": "Insurance payer identifier." },
+        { "name": "payerName", "type": "string", "required": true, "description": "Payer display name." },
+        { "name": "locationId", "type": "string", "required": true, "description": "Clinic identifier." },
+        { "name": "periodStart", "type": "string", "required": true, "description": "Start of the reporting window." },
+        { "name": "periodEnd", "type": "string", "required": true, "description": "End of the reporting window." },
+        { "name": "totalClaims", "type": "number", "required": true, "description": "Total claims in the window." },
+        { "name": "deniedClaims", "type": "number", "required": true, "description": "Denied claims in the window." },
+        { "name": "denialRate", "type": "number", "required": true, "description": "Denied claims divided by total claims." }
+      ]
+    },
+    {
+      "event_type": "no_show_impact_calculated",
+      "class": "mandatory",
+      "delivery": "batch",
+      "description": "Periodic no-show revenue impact roll-up.",
+      "hypothesis": "We need to know where missed visits are costing the business the most.",
+      "decision": "Focus reminder and access improvements on the highest-impact locations.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Report location-level aggregates only.",
+      "propertyAllowlist": ["locationId", "periodStart", "periodEnd", "scheduledAppointments", "noShowCount", "noShowRate", "estimatedLostRevenue"],
+      "properties": [
+        { "name": "locationId", "type": "string", "required": true, "description": "Clinic identifier." },
+        { "name": "periodStart", "type": "string", "required": true, "description": "Start of the reporting window." },
+        { "name": "periodEnd", "type": "string", "required": true, "description": "End of the reporting window." },
+        { "name": "scheduledAppointments", "type": "number", "required": true, "description": "Scheduled appointments in the window." },
+        { "name": "noShowCount", "type": "number", "required": true, "description": "No-shows in the window." },
+        { "name": "noShowRate", "type": "number", "required": true, "description": "No-shows divided by scheduled appointments." },
+        { "name": "estimatedLostRevenue", "type": "number", "required": true, "description": "Estimated revenue lost to no-shows." }
+      ]
+    },
+    {
+      "event_type": "auth_login_attempted",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "Authentication attempt emitted by the login flow.",
+      "hypothesis": "We need to know how often users try to authenticate and from which client surfaces.",
+      "decision": "Detect friction before it becomes support load.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Never emit raw email or password values.",
+      "propertyAllowlist": ["authMethod", "clientApp", "userRole", "authProvider", "mfaUsed"],
+      "properties": [
+        { "name": "authMethod", "type": "string", "required": true, "description": "Authentication method used." },
+        { "name": "clientApp", "type": "string", "required": true, "description": "Frontend or client application name." },
+        { "name": "userRole", "type": "string", "required": false, "description": "Role associated with the attempt." },
+        { "name": "authProvider", "type": "string", "required": false, "description": "Identity provider or backend auth source." },
+        { "name": "mfaUsed", "type": "boolean", "required": false, "description": "Whether MFA was part of the attempt." }
+      ]
+    },
+    {
+      "event_type": "auth_login_failed",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "Failed authentication attempt.",
+      "hypothesis": "We need to know whether failures are caused by bad credentials, lockouts, or system errors.",
+      "decision": "Tune lockout rules and login UX.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Use failure codes only.",
+      "propertyAllowlist": ["authMethod", "clientApp", "userRole", "failureReason", "lockoutTriggered", "attemptCount"],
+      "properties": [
+        { "name": "authMethod", "type": "string", "required": true, "description": "Authentication method used." },
+        { "name": "clientApp", "type": "string", "required": true, "description": "Frontend or client application name." },
+        { "name": "userRole", "type": "string", "required": false, "description": "Role associated with the failed attempt." },
+        { "name": "failureReason", "type": "string", "required": true, "description": "Reason code for the failure." },
+        { "name": "lockoutTriggered", "type": "boolean", "required": false, "description": "Whether a lockout threshold was reached." },
+        { "name": "attemptCount", "type": "number", "required": false, "description": "Consecutive failed attempts." }
+      ]
+    },
+    {
+      "event_type": "auth_session_expired",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "Authentication session expiry event.",
+      "hypothesis": "We need to know when and why sessions lapse.",
+      "decision": "Balance security timeouts against operator inconvenience.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Keep session identifiers opaque.",
+      "propertyAllowlist": ["sessionAgeMinutes", "authMethod", "clientApp", "expiryReason"],
+      "properties": [
+        { "name": "sessionAgeMinutes", "type": "number", "required": true, "description": "Age of the expired session in minutes." },
+        { "name": "authMethod", "type": "string", "required": false, "description": "Authentication method used." },
+        { "name": "clientApp", "type": "string", "required": true, "description": "Frontend or client application name." },
+        { "name": "expiryReason", "type": "string", "required": true, "description": "Reason code for session expiry." }
+      ]
+    },
+    {
+      "event_type": "navigation_section_opened",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "Navigation event for opening a section or route.",
+      "hypothesis": "We need to know which sections operators visit most.",
+      "decision": "Improve layout, prioritization, and training.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Section and route names only; no content payloads.",
+      "propertyAllowlist": ["sectionName", "route", "previousRoute", "userRole", "entryPoint"],
+      "properties": [
+        { "name": "sectionName", "type": "string", "required": true, "description": "Section opened by the user." },
+        { "name": "route", "type": "string", "required": true, "description": "Current application route." },
+        { "name": "previousRoute", "type": "string", "required": false, "description": "Route visited immediately before." },
+        { "name": "userRole", "type": "string", "required": false, "description": "Role associated with the navigation." },
+        { "name": "entryPoint", "type": "string", "required": false, "description": "How the user entered the section." }
+      ]
+    },
+    {
+      "event_type": "workflow_abandoned",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "User or operator left a workflow before completion.",
+      "hypothesis": "We need to know where users drop out mid-flow.",
+      "decision": "Shorten forms, clarify validation, and remove dead ends.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Do not emit form contents or free-text notes.",
+      "propertyAllowlist": ["flowName", "stepName", "lastCompletedStep", "timeSinceStartSeconds", "exitRoute", "userRole"],
+      "properties": [
+        { "name": "flowName", "type": "string", "required": true, "description": "Workflow name." },
+        { "name": "stepName", "type": "string", "required": true, "description": "Step where abandonment occurred." },
+        { "name": "lastCompletedStep", "type": "string", "required": false, "description": "Most recent completed step." },
+        { "name": "timeSinceStartSeconds", "type": "number", "required": true, "description": "Seconds elapsed in the workflow." },
+        { "name": "exitRoute", "type": "string", "required": false, "description": "Route the user exited to or closed on." },
+        { "name": "userRole", "type": "string", "required": false, "description": "Role associated with the workflow." }
+      ]
+    },
+    {
+      "event_type": "api_latency_recorded",
+      "class": "opportunity",
+      "delivery": "batch",
+      "description": "Aggregated API latency metric.",
+      "hypothesis": "We need to know which endpoints are slowing operators down.",
+      "decision": "Prioritize backend tuning and caching work.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Transport metrics only.",
+      "propertyAllowlist": ["route", "method", "statusCode", "durationMs", "domain", "requestSizeBytes", "responseSizeBytes"],
+      "properties": [
+        { "name": "route", "type": "string", "required": true, "description": "API route or endpoint path." },
+        { "name": "method", "type": "string", "required": true, "description": "HTTP method." },
+        { "name": "statusCode", "type": "number", "required": true, "description": "HTTP status code." },
+        { "name": "durationMs", "type": "number", "required": true, "description": "Request duration in milliseconds." },
+        { "name": "domain", "type": "string", "required": false, "description": "Business or technical domain." },
+        { "name": "requestSizeBytes", "type": "number", "required": false, "description": "Approximate request payload size." },
+        { "name": "responseSizeBytes", "type": "number", "required": false, "description": "Approximate response payload size." }
+      ]
+    },
+    {
+      "event_type": "frontend_error_occurred",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "Recoverable or unrecoverable frontend error.",
+      "hypothesis": "We need to know which pages and components are breaking in the browser.",
+      "decision": "Fix usability issues before they become support incidents.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "No raw stack traces or payloads; fingerprint only.",
+      "propertyAllowlist": ["pageRoute", "componentName", "errorClass", "errorFingerprint", "recoverable", "actionTaken"],
+      "properties": [
+        { "name": "pageRoute", "type": "string", "required": true, "description": "Route where the error happened." },
+        { "name": "componentName", "type": "string", "required": false, "description": "Component name if known." },
+        { "name": "errorClass", "type": "string", "required": true, "description": "Error class or category." },
+        { "name": "errorFingerprint", "type": "string", "required": true, "description": "Stable deduplication fingerprint." },
+        { "name": "recoverable", "type": "boolean", "required": true, "description": "Whether the UI recovered." },
+        { "name": "actionTaken", "type": "string", "required": false, "description": "User or system action taken after the error." }
+      ]
+    },
+    {
+      "event_type": "backend_unhandled_exception",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "Unhandled server-side exception.",
+      "hypothesis": "We need to know which code paths are failing server-side.",
+      "decision": "Fix defects and protect user flows before they spread.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "No stack traces in telemetry; send fingerprints and sanitized metadata only.",
+      "propertyAllowlist": ["route", "exceptionClass", "errorFingerprint", "requestMethod", "statusCode", "workerId"],
+      "properties": [
+        { "name": "route", "type": "string", "required": true, "description": "Route where the exception occurred." },
+        { "name": "exceptionClass", "type": "string", "required": true, "description": "Exception class or category." },
+        { "name": "errorFingerprint", "type": "string", "required": true, "description": "Stable deduplication fingerprint." },
+        { "name": "requestMethod", "type": "string", "required": true, "description": "HTTP method for the request." },
+        { "name": "statusCode", "type": "number", "required": true, "description": "HTTP status returned after the exception." },
+        { "name": "workerId", "type": "string", "required": false, "description": "Worker or container identifier." }
+      ]
+    },
+    {
+      "event_type": "supplier_rate_updated",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "Supplier rate changed in the procurement flow.",
+      "hypothesis": "We need to know when procurement prices move.",
+      "decision": "Detect margin pressure and renegotiate with the right suppliers.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Supplier IDs are internal only.",
+      "propertyAllowlist": ["supplierId", "previousRate", "newRate", "country", "category", "updatedByRole"],
+      "properties": [
+        { "name": "supplierId", "type": "number", "required": true, "description": "Opaque supplier identifier." },
+        { "name": "previousRate", "type": "number", "required": true, "description": "Previous rate value." },
+        { "name": "newRate", "type": "number", "required": true, "description": "Updated rate value." },
+        { "name": "country", "type": "string", "required": true, "description": "Supplier country." },
+        { "name": "category", "type": "string", "required": false, "description": "Supplier category." },
+        { "name": "updatedByRole", "type": "string", "required": false, "description": "Role of the person who updated the rate." }
+      ]
+    },
+    {
+      "event_type": "incident_status_changed",
+      "class": "opportunity",
+      "delivery": "stream",
+      "description": "Incident workflow status transition.",
+      "hypothesis": "We need to know how incidents move through the workflow.",
+      "decision": "Identify bottlenecks and stuck cases quickly.",
+      "containsSensitiveDataOrPII": false,
+      "redactionStrategy": "Incident identifiers only; no descriptive free-text fields.",
+      "propertyAllowlist": ["incidentId", "previousStatus", "nextStatus", "origin", "category", "actorRole", "timeInPreviousStatusHours"],
+      "properties": [
+        { "name": "incidentId", "type": "number", "required": true, "description": "Opaque incident identifier." },
+        { "name": "previousStatus", "type": "string", "required": true, "description": "Status before the transition." },
+        { "name": "nextStatus", "type": "string", "required": true, "description": "Status after the transition." },
+        { "name": "origin", "type": "string", "required": false, "description": "Incident origin." },
+        { "name": "category", "type": "string", "required": false, "description": "Incident category." },
+        { "name": "actorRole", "type": "string", "required": false, "description": "Role of the actor who performed the transition." },
+        { "name": "timeInPreviousStatusHours", "type": "number", "required": false, "description": "Time spent in the previous status." }
+      ]
+    }
+  ]
+}
