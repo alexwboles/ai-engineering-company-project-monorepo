@@ -53,6 +53,9 @@ export function NavClient() {
       <Link href="/knowledge" className="rounded-full bg-teal-100 px-3 py-1 font-medium text-teal-800 hover:bg-teal-200">
         Knowledge
       </Link>
+      <Link href="/chat" className="rounded-full bg-sky-100 px-3 py-1 font-medium text-sky-800 hover:bg-sky-200">
+        Support Chat
+      </Link>
       <Link href="/account/profile" className="rounded-full bg-indigo-100 px-3 py-1 font-medium text-indigo-800 hover:bg-indigo-200">
         Profile
       </Link>

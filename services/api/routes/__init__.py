@@ -10,6 +10,7 @@ from .tasks import router as tasks_router
 from .rfp import router as rfp_router
 from .agent import router as agent_router
 from .knowledge import router as knowledge_router
+from .realtime import router as realtime_router
 
 __all__ = [
     "suppliers_router",
@@ -24,4 +25,5 @@ __all__ = [
     "rfp_router",
     "agent_router",
     "knowledge_router",
+    "realtime_router",
 ]
