@@ -1,0 +1,4 @@
+# Run at 02:00 UTC every night on a host with the repository's services/api
+# virtual environment installed. The worker is a separate process from FastAPI.
+CRON_TZ=UTC
+0 2 * * * cd /opt/healthcore && /opt/healthcore/services/api/.venv/bin/python scripts/nightly_export.py >> /opt/healthcore/logs/nightly_export.log 2>&1
