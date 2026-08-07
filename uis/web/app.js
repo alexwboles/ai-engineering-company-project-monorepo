@@ -10,6 +10,8 @@ const resultsSection = document.getElementById("results-section");
 const summaryGrid = document.getElementById("summary-grid");
 const categoryList = document.getElementById("category-list");
 const statusList = document.getElementById("status-list");
+const clinicList = document.getElementById("clinic-list");
+const countryList = document.getElementById("country-list");
 const invalidList = document.getElementById("invalid-list");
 
 let selectedFile = null;
@@ -61,6 +63,8 @@ function renderResults(payload) {
 
   renderKeyValueList(categoryList, summary.category_breakdown);
   renderKeyValueList(statusList, summary.status_breakdown);
+  renderKeyValueList(clinicList, summary.clinic_breakdown);
+  renderKeyValueList(countryList, summary.country_breakdown);
   renderKeyValueList(invalidList, summary.invalid_by_reason);
 
   resultsSection.classList.remove("hidden");
@@ -84,24 +88,38 @@ async function handleAnalyze() {
   formData.append("file", selectedFile);
 
   setStatus("Uploading and analyzing...");
+  analyzeBtn.disabled = true;
   try {
     const response = await fetch(`${API_BASE_URL}/api/incidents/analyze`, {
       method: "POST",
       body: formData,
     });
 
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload.detail || "Unable to analyze file.");
+      throw new Error(readableApiError(payload, response.status));
     }
 
     renderResults(payload);
   } catch (error) {
-    setStatus(`Error: ${error.message}`, true);
+    setStatus(`Error: ${error instanceof Error ? error.message : "Unable to analyze file."}`, true);
+  } finally {
+    analyzeBtn.disabled = false;
   }
 }
 
+function readableApiError(payload, status) {
+  const detail = payload?.detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.map((item) => item?.msg || item?.message).filter(Boolean);
+    if (messages.length) return messages.join(" ");
+  }
+  if (typeof detail === "string" && detail.trim()) return detail;
+  return `Unable to analyze file (HTTP ${status}).`;
+}
+
 function handleFileSelect(file) {
+  selectedFile = file;
   selectedFile = file;
   setStatus(`Selected file: ${file.name}`);
 }

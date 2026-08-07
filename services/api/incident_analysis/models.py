@@ -19,4 +19,6 @@ class AnalysisSummary:
     invalid_by_reason: dict[str, int]
     category_breakdown: dict[str, int]
     status_breakdown: dict[str, int]
+    clinic_breakdown: dict[str, int]
+    country_breakdown: dict[str, int]
     average_satisfaction_closed: float | None

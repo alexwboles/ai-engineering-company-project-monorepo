@@ -24,6 +24,12 @@ def summary_to_csv_text(summary: AnalysisSummary) -> str:
     for status, count in sorted(summary.status_breakdown.items()):
         writer.writerow([f"status.{status}", count])
 
+    for clinic, count in sorted(summary.clinic_breakdown.items()):
+        writer.writerow([f"clinic.{clinic}", count])
+
+    for country, count in sorted(summary.country_breakdown.items()):
+        writer.writerow([f"country.{country}", count])
+
     avg_value: Any = ""
     if summary.average_satisfaction_closed is not None:
         avg_value = f"{summary.average_satisfaction_closed:.4f}"

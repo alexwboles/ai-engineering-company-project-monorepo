@@ -1,22 +1,34 @@
 {
   "total_records": 100,
-  "valid_records": 80,
-  "invalid_records": 20,
+  "valid_records": 94,
+  "invalid_records": 6,
   "invalid_by_reason": {
-    "invalid_category": 10,
-    "invalid_status": 5,
-    "out_of_range": 3,
-    "missing_required_field": 2
+    "invalid_clinic_id": 1,
+    "clinic_country_mismatch": 1,
+    "invalid_patient_id": 1,
+    "invalid_category": 1,
+    "invalid_status": 1,
+    "missing_required_field": 1
   },
   "category_breakdown": {
-    "request": 27,
-    "operational_failure": 27,
-    "complaint": 26
+    "APPOINTMENT": 47,
+    "BILLING": 47
   },
   "status_breakdown": {
-    "open": 32,
-    "closed": 32,
-    "discarded": 16
+    "OPEN": 40,
+    "CLOSED": 40,
+    "DISCARDED": 14
   },
-  "average_satisfaction_closed": 3.806250000000001
+  "clinic_breakdown": {
+    "us-tx-001": 19,
+    "us-fl-001": 19,
+    "us-ga-001": 19,
+    "uk-lon-001": 19,
+    "uk-man-001": 18
+  },
+  "country_breakdown": {
+    "US": 57,
+    "UK": 37
+  },
+  "average_satisfaction_closed": 3.58
 }

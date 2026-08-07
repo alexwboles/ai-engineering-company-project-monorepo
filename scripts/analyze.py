@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import csv
 import sys
 from pathlib import Path
 
@@ -9,7 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from services.api.incident_analysis import load_and_analyze_csv, summary_to_csv_text, summary_to_dict
+from services.api.incident_analysis import (
+    load_and_analyze_csv,
+    summary_to_csv_text,
+    summary_to_dict,
+    values_match_expected,
+)
 from services.api.incident_analysis.config import DEFAULT_EXPECTED_RESULTS_PATH
 
 
@@ -31,6 +37,14 @@ def format_summary(summary: dict[str, object], invalid_preview: list[dict[str, o
     status_breakdown = summary.get("status_breakdown", {})
     for status, count in sorted(status_breakdown.items()):
         lines.append(f"  - {status:<22} {count}")
+    lines.append("-" * 78)
+    lines.append("Breakdown by clinic (valid records)")
+    for clinic, count in sorted(summary.get("clinic_breakdown", {}).items()):
+        lines.append(f"  - {clinic:<22} {count}")
+    lines.append("-" * 78)
+    lines.append("Breakdown by country (valid records)")
+    for country, count in sorted(summary.get("country_breakdown", {}).items()):
+        lines.append(f"  - {country:<22} {count}")
     lines.append("-" * 78)
     lines.append("Invalid records by reason")
     invalid_by_reason = summary.get("invalid_by_reason", {})
@@ -56,17 +70,17 @@ def format_summary(summary: dict[str, object], invalid_preview: list[dict[str, o
     return "\n".join(lines)
 
 
-def verify_against_expected(summary: dict[str, object], expected_path: Path) -> None:
+def verify_against_expected(summary: dict[str, object], expected_path: Path) -> bool:
     if not expected_path.exists():
         print(f"Expected-values file not found at {expected_path}. Verification skipped.")
-        return
+        return True
 
     with expected_path.open("r", encoding="utf-8") as handle:
         expected = json.load(handle)
 
     mismatches: list[str] = []
     for key, expected_value in expected.items():
-        if summary.get(key) != expected_value:
+        if not values_match_expected(summary.get(key), expected_value):
             mismatches.append(
                 f"{key}: expected={expected_value!r}, actual={summary.get(key)!r}"
             )
@@ -75,8 +89,10 @@ def verify_against_expected(summary: dict[str, object], expected_path: Path) -> 
         print("Verification result: FAILED")
         for mismatch in mismatches:
             print(f"  - {mismatch}")
+        return False
     else:
         print("Verification result: OK (matches expected values)")
+        return True
 
 
 def main() -> int:
@@ -87,7 +103,7 @@ def main() -> int:
     csv_path = Path(sys.argv[1]).resolve()
     try:
         summary, invalid_records, _valid_rows = load_and_analyze_csv(csv_path)
-    except Exception as exc:
+    except (OSError, UnicodeDecodeError, csv.Error, ValueError) as exc:
         print(f"Error: {exc}")
         return 1
 
@@ -103,7 +119,12 @@ def main() -> int:
     ]
 
     print(format_summary(summary_dict, invalid_preview))
-    verify_against_expected(summary_dict, DEFAULT_EXPECTED_RESULTS_PATH)
+    official_sample = (ROOT / "scripts" / "incidents-healthcore.csv").resolve()
+    verification_ok = True
+    if csv_path == official_sample:
+        verification_ok = verify_against_expected(summary_dict, DEFAULT_EXPECTED_RESULTS_PATH)
+    else:
+        print("Verification result: SKIPPED (input is not the official HealthCore sample)")
 
     choice = input("Export results to CSV? [y / n]: ").strip().lower()
     if choice == "y":
@@ -113,7 +134,7 @@ def main() -> int:
     else:
         print("Export skipped.")
 
-    return 0
+    return 0 if verification_ok else 1
 
 
 if __name__ == "__main__":

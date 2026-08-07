@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import io
 from dataclasses import asdict
 from typing import Any
 
@@ -22,14 +21,14 @@ except ModuleNotFoundError:
 try:
     # Works when imported as services.api.main from repository root.
     from services.api.incident_analysis import (
-        analyze_incident_rows,
+        analyze_incident_csv_text,
         now_iso,
         summary_to_csv_text,
         summary_to_dict,
     )
 except ModuleNotFoundError:
     # Works when running uvicorn from services/api with module path main:app.
-    from incident_analysis import analyze_incident_rows, now_iso, summary_to_csv_text, summary_to_dict
+    from incident_analysis import analyze_incident_csv_text, now_iso, summary_to_csv_text, summary_to_dict
 
 app = FastAPI(title="HealthCore Incident Analysis API", version="1.0.0")
 
@@ -104,11 +103,8 @@ async def analyze_incidents(
         raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from exc
 
     try:
-        reader = csv.DictReader(io.StringIO(text))
-        if reader.fieldnames is None:
-            raise ValueError("CSV header row is missing.")
-        summary, invalid_records, _valid_rows = analyze_incident_rows(reader)
-    except Exception as exc:
+        summary, invalid_records, _valid_rows = analyze_incident_csv_text(text)
+    except (csv.Error, ValueError) as exc:
         raise HTTPException(status_code=400, detail=f"Unable to process CSV: {exc}") from exc
 
     payload = {
