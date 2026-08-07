@@ -1,7 +1,10 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, apiRequest } from "@/lib/api-client";
+import { getStoredToken } from "@/lib/auth-client";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://api:8000";
 
 type TicketStatus = "analyzing" | "waiting_for_approval" | "done" | "discarded" | "failed" | "drafting" | "under_evaluation" | "needs_human_review" | "ready_for_approval" | "awaiting_approval" | "partially_approved" | "needs_revision" | "arbitrating" | "producing";
 
@@ -71,6 +74,30 @@ type RfpTicket = {
   final_document?: { filename?: string; generated_at?: string } | null;
 };
 
+type SseNotification = {
+  id: string;
+  event: string;
+  data: Record<string, unknown>;
+};
+
+function parseSseBlock(block: string): SseNotification | null {
+  let id = "";
+  let event = "message";
+  const dataLines: string[] = [];
+  for (const line of block.split(/\r?\n/)) {
+    if (line.startsWith("id:")) id = line.slice(3).trim();
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  }
+  if (!dataLines.length) return null;
+  try {
+    const data: unknown = JSON.parse(dataLines.join("\n"));
+    return data && typeof data === "object" ? { id, event, data: data as Record<string, unknown> } : null;
+  } catch {
+    return null;
+  }
+}
+
 const STATUS_STYLES: Record<TicketStatus, string> = {
   analyzing: "bg-blue-100 text-blue-800",
   waiting_for_approval: "bg-amber-100 text-amber-800",
@@ -99,6 +126,10 @@ export default function RfpIntakePage() {
   const [approvalAction, setApprovalAction] = useState<string | null>(null);
   const [approvalComments, setApprovalComments] = useState<Record<string, string>>({});
   const [finalDocument, setFinalDocument] = useState<{ ticketId: string; filename: string; content: string } | null>(null);
+  const [streamStatus, setStreamStatus] = useState<"connecting" | "connected" | "reconnecting">("connecting");
+  const [realtimeNotice, setRealtimeNotice] = useState("");
+  const seenEventIds = useRef(new Set<string>());
+  const lastEventId = useRef("");
 
   const loadTickets = useCallback(async () => {
     try {
@@ -117,12 +148,82 @@ export default function RfpIntakePage() {
   }, [loadTickets]);
 
   useEffect(() => {
-    if (!tickets.some((ticket) => ["analyzing", "waiting_for_approval", "drafting", "under_evaluation", "awaiting_approval", "partially_approved", "needs_revision", "arbitrating", "producing"].includes(ticket.status))) {
-      return;
+    let stopped = false;
+    let retryAttempt = 0;
+    let retryTimer: number | null = null;
+    let controller: AbortController | null = null;
+
+    async function consumeNotification(notification: SseNotification) {
+      if (notification.id && seenEventIds.current.has(notification.id)) return;
+      if (notification.id) {
+        seenEventIds.current.add(notification.id);
+        lastEventId.current = notification.id;
+      }
+
+      const ticketId = typeof notification.data.ticket_id === "string" ? notification.data.ticket_id : "";
+      if (!ticketId || !["rfp_ticket_created", "rfp_ticket_updated"].includes(notification.event)) return;
+
+      if (notification.event === "rfp_ticket_created") {
+        const status = typeof notification.data.status === "string" ? notification.data.status : "analyzing";
+        setRealtimeNotice(`New RFP ticket ${ticketId.slice(0, 12)} needs processing (${status.replaceAll("_", " ")}).`);
+      }
+
+      try {
+        const ticket = await apiRequest<RfpTicket>(`/rfp/tickets/${ticketId}`);
+        setTickets((current) => {
+          const exists = current.some((item) => item.id === ticket.id);
+          return exists ? current.map((item) => item.id === ticket.id ? ticket : item) : [ticket, ...current];
+        });
+      } catch {
+        // The named notification remains visible even if the detail request is transiently unavailable.
+      }
     }
-    const timer = window.setInterval(() => void loadTickets(), 2000);
-    return () => window.clearInterval(timer);
-  }, [loadTickets, tickets]);
+
+    async function connect() {
+      if (stopped) return;
+      const token = getStoredToken();
+      if (!token) return;
+      setStreamStatus(retryAttempt === 0 ? "connecting" : "reconnecting");
+      controller = new AbortController();
+      try {
+        const response = await fetch(`${API_BASE_URL}/rfp/tickets/stream`, {
+          headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}`, ...(lastEventId.current ? { "Last-Event-ID": lastEventId.current } : {}) },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok || !response.body) throw new Error("SSE stream unavailable");
+        retryAttempt = 0;
+        setStreamStatus("connected");
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (!stopped) {
+          const { done, value } = await reader.read();
+          if (done) throw new Error("SSE stream closed");
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split(/\r?\n\r?\n/);
+          buffer = blocks.pop() ?? "";
+          for (const block of blocks) {
+            const notification = parseSseBlock(block);
+            if (notification) await consumeNotification(notification);
+          }
+        }
+      } catch {
+        if (stopped) return;
+        setStreamStatus("reconnecting");
+        const delay = Math.min(1000 * 2 ** Math.min(retryAttempt, 5), 30000);
+        retryAttempt += 1;
+        retryTimer = window.setTimeout(() => void connect(), delay);
+      }
+    }
+
+    void connect();
+    return () => {
+      stopped = true;
+      controller?.abort();
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+    };
+  }, []);
 
   async function uploadRfp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -242,10 +343,12 @@ export default function RfpIntakePage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-semibold text-slate-950">Tickets</h2>
-            <p className="mt-1 text-sm text-slate-600">Statuses refresh while analysis is in progress.</p>
+            <p className="mt-1 text-sm text-slate-600">Live ticket notifications: <span className={streamStatus === "connected" ? "font-semibold text-emerald-700" : "font-semibold text-amber-700"}>{streamStatus}</span></p>
           </div>
           <button type="button" onClick={() => void loadTickets()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Refresh</button>
         </div>
+
+        {realtimeNotice ? <p className="mt-4 rounded-xl border border-cyan-300 bg-cyan-50 px-4 py-3 text-sm font-semibold text-cyan-950" role="status">{realtimeNotice}</p> : null}
 
         {loading ? <p className="mt-4 rounded-xl bg-white p-6 text-sm text-slate-600">Loading RFP tickets...</p> : null}
         {!loading && tickets.length === 0 ? <p className="mt-4 rounded-xl bg-white p-6 text-sm text-slate-600">No RFP tickets yet.</p> : null}

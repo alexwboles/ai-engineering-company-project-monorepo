@@ -2,21 +2,27 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import queue
 import uuid
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, Field
+from starlette.responses import StreamingResponse
 
 try:
     from services.api.auth_security import get_current_user
+    from services.realtime_notifications import Notification, notification_broker
     from services.rfp_intake.pipeline import process_rfp_ticket
     from services.rfp_intake.store import RfpTicketStore, default_artifact_dir
     from services.rfp_response.pipeline import process_rfp_response
     from services.rfp_approval import ApprovalWorkflowError, get_approval_state, read_final_document, resume, start_approval_run
 except ModuleNotFoundError:
     from auth_security import get_current_user
+    from realtime_notifications import Notification, notification_broker
     from rfp_intake.pipeline import process_rfp_ticket
     from rfp_intake.store import RfpTicketStore, default_artifact_dir
     from rfp_response.pipeline import process_rfp_response
@@ -30,6 +36,31 @@ ticket_store = RfpTicketStore()
 class ApprovalDecisionRequest(BaseModel):
     decision: Literal["approve", "reject", "request_changes"]
     comment: str | None = Field(default=None, max_length=2000)
+
+
+def format_sse(notification: Notification) -> str:
+    """Serialize one named notification using the SSE wire format."""
+
+    encoded_data = json.dumps(notification.payload, separators=(",", ":"), ensure_ascii=True)
+    return f"id: {notification.event_id}\nevent: {notification.event_name}\ndata: {encoded_data}\n\n"
+
+
+async def _notification_stream(request: Request, *, user_id: int) -> Any:
+    subscriber_id, subscriber_queue = notification_broker.subscribe(
+        user_id=user_id,
+        last_event_id=request.headers.get("last-event-id"),
+    )
+    try:
+        yield ": connected\n\n"
+        while not await request.is_disconnected():
+            try:
+                notification = await asyncio.to_thread(subscriber_queue.get, True, 15)
+            except queue.Empty:
+                yield ": keep-alive\n\n"
+                continue
+            yield format_sse(notification)
+    finally:
+        notification_broker.unsubscribe(subscriber_id)
 
 
 @router.post("/tickets", status_code=status.HTTP_202_ACCEPTED)
@@ -68,6 +99,24 @@ async def create_rfp_ticket(
     )
     background_tasks.add_task(process_rfp_ticket, ticket.id)
     return ticket.model_dump(mode="json")
+
+
+@router.get("/tickets/stream")
+async def stream_rfp_ticket_notifications(
+    request: Request,
+    current_user: Any = Depends(get_current_user),
+) -> StreamingResponse:
+    """Stream ticket-created and ticket-status events to an authenticated dashboard."""
+
+    return StreamingResponse(
+        _notification_stream(request, user_id=int(getattr(current_user, "id"))),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/tickets")

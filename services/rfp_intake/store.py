@@ -12,6 +12,11 @@ from tinydb import Query, TinyDB
 
 from .models import RfpTicket, RfpTicketStatus
 
+try:
+    from services.realtime_notifications import publish_rfp_ticket_created, publish_rfp_ticket_updated
+except ModuleNotFoundError:
+    from realtime_notifications import publish_rfp_ticket_created, publish_rfp_ticket_updated
+
 
 def default_ticket_db_path() -> Path:
     configured = os.getenv("RFP_TICKETS_DB_PATH")
@@ -43,6 +48,12 @@ class RfpTicketStore:
             owner_user_id=owner_user_id,
         )
         self._write(ticket)
+        publish_rfp_ticket_created(
+            ticket_id=ticket.id,
+            status=ticket.status.value,
+            created_at=ticket.created_at,
+            user_id=ticket.owner_user_id,
+        )
         return ticket
 
     def get(self, ticket_id: str) -> RfpTicket | None:
@@ -72,6 +83,13 @@ class RfpTicketStore:
         if "status" in changes and changes["status"] != previous_status:
             ticket.status_history.append({"status": str(changes["status"]), "at": ticket.updated_at.isoformat()})
         self._write(ticket)
+        if "status" in changes and changes["status"] != previous_status:
+            publish_rfp_ticket_updated(
+                ticket_id=ticket.id,
+                status=ticket.status.value,
+                updated_at=ticket.updated_at,
+                user_id=ticket.owner_user_id,
+            )
         return ticket
 
     def _write(self, ticket: RfpTicket) -> None:
