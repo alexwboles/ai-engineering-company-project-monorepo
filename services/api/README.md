@@ -59,17 +59,17 @@ The seed script is idempotent and does not duplicate rows already loaded from th
 ### Supplier directory
 
 - `POST /suppliers`
-  - Creates a supplier and returns it with TinyDB `id`.
+  - Creates a supplier using the context fields and returns it with TinyDB `id`.
   - Invalid payloads return `422`.
 - `GET /suppliers`
-  - Lists all suppliers.
+  - Lists all suppliers with `name`, `country`, `categories`, `monthly_rate`, `currency`, compliance, contract, contact, notes, status, and `updated_at`.
   - Optional query params: `country`, `category`.
 - `GET /suppliers/{id}`
   - Returns supplier by ID.
   - Returns `404` when not found.
 - `PATCH /suppliers/{id}/rate`
-  - Updates supplier `rate` and auto-updates `last_rate_update_date` and `updated_at`.
-  - Rejects `rate <= 0` with `422`.
+  - Updates supplier `monthly_rate` and records the server timestamp in `updated_at`.
+  - Rejects `monthly_rate <= 0` with `422`.
 - `PATCH /suppliers/{id}/status`
   - Updates supplier status.
   - Allowed values: `active`, `suspended`.
@@ -77,6 +77,12 @@ The seed script is idempotent and does not duplicate rows already loaded from th
 - `DELETE /suppliers/{id}`
   - Removes supplier by ID.
   - Returns `404` when not found.
+
+Evidence:
+
+- [Seeder output](../../screenshots/seed-output-terminal.png)
+- [Filtered endpoint response](../../screenshots/filter-endpoint-response.png)
+- [Filtered supplier UI](../../screenshots/supplier-list-filtered-ui.png)
 
 ### Authentication and password flows
 

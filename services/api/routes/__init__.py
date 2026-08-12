@@ -1,4 +1,4 @@
-from .suppliers import router as suppliers_router
+from .suppliers import router as suppliers_router, seed_suppliers
 from .users import router as users_router
 from .profiles import router as profiles_router
 from .auth import router as auth_router
@@ -13,6 +13,7 @@ from .knowledge import router as knowledge_router
 
 __all__ = [
     "suppliers_router",
+    "seed_suppliers",
     "users_router",
     "profiles_router",
     "auth_router",
