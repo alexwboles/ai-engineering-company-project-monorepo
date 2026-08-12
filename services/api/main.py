@@ -21,6 +21,7 @@ try:
         inventory_router,
         profiles_router,
         suppliers_router,
+        seed_suppliers,
         telemetry_router,
         telemetry_report_router,
         tasks_router,
@@ -38,6 +39,7 @@ except ModuleNotFoundError:
         inventory_router,
         profiles_router,
         suppliers_router,
+        seed_suppliers,
         telemetry_report_router,
         telemetry_router,
         tasks_router,
@@ -98,6 +100,7 @@ app.include_router(knowledge_router)
 @app.on_event("startup")
 def initialize_inventory_schema() -> None:
     init_inventory_db()
+    seed_suppliers()
 
 
 @app.exception_handler(RequestValidationError)

@@ -3,44 +3,52 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from tinydb import Query
 
 try:
-    from services.api.auth_security import get_current_user
     from services.api.database import get_suppliers_db
     from services.api.models import (
         INITIAL_SUPPLIERS,
-        ProductCategory,
+        SupplierCategory,
+        SupplierCountry,
         SupplierCreate,
         SupplierRateUpdate,
         SupplierResponse,
         SupplierStatusUpdate,
     )
 except ModuleNotFoundError:
-    from auth_security import get_current_user
     from database import get_suppliers_db
     from models import (
         INITIAL_SUPPLIERS,
-        ProductCategory,
+        SupplierCategory,
+        SupplierCountry,
         SupplierCreate,
         SupplierRateUpdate,
         SupplierResponse,
         SupplierStatusUpdate,
     )
 
-router = APIRouter(tags=["suppliers"])
-
-
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+router = APIRouter(tags=["suppliers"])
 
 
 def _to_response(doc_id: int, payload: dict[str, Any]) -> SupplierResponse:
     return SupplierResponse.model_validate({"id": doc_id, **payload})
 
 
+def _supplier_document(supplier: dict[str, object]) -> dict[str, object]:
+    document = dict(supplier)
+    document["updated_at"] = _now_utc().isoformat()
+    return document
+
+
 def seed_suppliers() -> int:
+    """Insert the context directory once, preserving existing TinyDB records."""
+
     inserted = 0
     supplier_query = Query()
 
@@ -52,68 +60,49 @@ def seed_suppliers() -> int:
             if exists:
                 continue
 
-            now = _now_utc()
-            doc = {
-                "name": name,
-                "country": country,
-                "product_categories": list(supplier["product_categories"]),
-                "rate": float(supplier["rate"]),
-                "status": str(supplier["status"]),
-                "last_rate_update_date": now.date().isoformat(),
-                "updated_at": now.isoformat(),
-            }
-            db.insert(doc)
+            # Validate the seeder payload before it reaches TinyDB.
+            SupplierCreate.model_validate(supplier)
+            document = _supplier_document(supplier)
+            db.insert(document)
             inserted += 1
 
     return inserted
 
 
 @router.post("/suppliers", response_model=SupplierResponse, status_code=201)
-def create_supplier(payload: SupplierCreate, current_user=Depends(get_current_user)) -> SupplierResponse:
-    _ = current_user
-    now = _now_utc()
-    doc = {
+def create_supplier(payload: SupplierCreate) -> SupplierResponse:
+    document = {
         **payload.model_dump(mode="json"),
-        "last_rate_update_date": now.date().isoformat(),
-        "updated_at": now.isoformat(),
+        "updated_at": _now_utc().isoformat(),
     }
 
     with get_suppliers_db() as db:
-        doc_id = db.insert(doc)
+        doc_id = db.insert(document)
 
-    return _to_response(doc_id, doc)
+    return _to_response(doc_id, document)
 
 
 @router.get("/suppliers", response_model=list[SupplierResponse])
 def list_suppliers(
-    country: str | None = None,
-    category: ProductCategory | str | None = None,
-    current_user=Depends(get_current_user),
+    country: SupplierCountry | None = None,
+    category: SupplierCategory | None = None,
 ) -> list[SupplierResponse]:
-    _ = current_user
     with get_suppliers_db() as db:
         rows = db.all()
 
     suppliers = [_to_response(row.doc_id, dict(row)) for row in rows]
 
     if country:
-        country_lower = country.strip().lower()
-        suppliers = [item for item in suppliers if item.country.lower() == country_lower]
+        suppliers = [item for item in suppliers if item.country == country]
 
     if category:
-        category_lower = category.value.lower() if isinstance(category, ProductCategory) else category.lower()
-        suppliers = [
-            item
-            for item in suppliers
-            if any(existing.value.lower() == category_lower for existing in item.product_categories)
-        ]
+        suppliers = [item for item in suppliers if category in item.categories]
 
     return suppliers
 
 
 @router.get("/suppliers/{supplier_id}", response_model=SupplierResponse)
-def get_supplier(supplier_id: int, current_user=Depends(get_current_user)) -> SupplierResponse:
-    _ = current_user
+def get_supplier(supplier_id: int) -> SupplierResponse:
     with get_suppliers_db() as db:
         row = db.get(doc_id=supplier_id)
 
@@ -124,21 +113,16 @@ def get_supplier(supplier_id: int, current_user=Depends(get_current_user)) -> Su
 
 
 @router.patch("/suppliers/{supplier_id}/rate", response_model=SupplierResponse)
-def update_supplier_rate(
-    supplier_id: int, payload: SupplierRateUpdate, current_user=Depends(get_current_user)
-) -> SupplierResponse:
-    _ = current_user
+def update_supplier_rate(supplier_id: int, payload: SupplierRateUpdate) -> SupplierResponse:
     with get_suppliers_db() as db:
         row = db.get(doc_id=supplier_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Supplier not found.")
 
-        now = _now_utc()
         db.update(
             {
-                "rate": payload.rate,
-                "last_rate_update_date": now.date().isoformat(),
-                "updated_at": now.isoformat(),
+                "monthly_rate": payload.monthly_rate,
+                "updated_at": _now_utc().isoformat(),
             },
             doc_ids=[supplier_id],
         )
@@ -151,10 +135,7 @@ def update_supplier_rate(
 
 
 @router.patch("/suppliers/{supplier_id}/status", response_model=SupplierResponse)
-def update_supplier_status(
-    supplier_id: int, payload: SupplierStatusUpdate, current_user=Depends(get_current_user)
-) -> SupplierResponse:
-    _ = current_user
+def update_supplier_status(supplier_id: int, payload: SupplierStatusUpdate) -> SupplierResponse:
     with get_suppliers_db() as db:
         row = db.get(doc_id=supplier_id)
         if row is None:
@@ -176,8 +157,7 @@ def update_supplier_status(
 
 
 @router.delete("/suppliers/{supplier_id}", status_code=200)
-def delete_supplier(supplier_id: int, current_user=Depends(get_current_user)) -> dict[str, str]:
-    _ = current_user
+def delete_supplier(supplier_id: int) -> dict[str, str]:
     with get_suppliers_db() as db:
         row = db.get(doc_id=supplier_id)
         if row is None:
